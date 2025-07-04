@@ -15,7 +15,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-TARGET_REPOS = 1
+TARGET_REPOS = 100000
 MAX_CLONE_THREADS = 10
 MAX_PROCESS_WORKERS = os.cpu_count() or 4
 MAX_RETRIES = 3
