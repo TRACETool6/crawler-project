@@ -10,9 +10,9 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-BASE_PATH = "dataset"
-CRAWLED_DB_PATH = "crawler_db.sqlite"
-GROUP_NAME = "all_repos"
+BASE_PATH = f"fivekdataset"
+CRAWLED_DB_PATH = f"crawler_db.sqlite"
+GROUP_NAME = "all_repos_fivek"
 GITHUB_TOKEN = os.environ.get("GPAT")
 BATCH_SIZE = 5000 
 

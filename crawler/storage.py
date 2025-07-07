@@ -18,6 +18,8 @@ except ImportError:
     CRAWLED_DB_PATH = "crawler_db.sqlite"
 
 
+
+
 def save_repo_data(group_name, repo_name, repo_info, commits, file_index, repo_path):
     """
     Saves the extracted repository data (info, commits, file index) to JSON files.
@@ -32,25 +34,20 @@ def save_repo_data(group_name, repo_name, repo_info, commits, file_index, repo_p
                          This is used to determine the base directory for saving data.
     """
     try:
+        logs = {}
+        logs["commitLog"] = commits
+        logs["metadataLog"] = repo_info
         repo_data_dir = os.path.join(BASE_PATH, group_name, repo_name)
         os.makedirs(repo_data_dir, exist_ok=True)
         logging.info(f"Ensured data directory exists: {repo_data_dir}")
 
-        repo_info_path = os.path.join(repo_data_dir, "repo_info.json")
-        with open(repo_info_path, "w", encoding="utf-8") as f:
-            json.dump(repo_info, f, indent=4)
-        logging.info(f"Saved repo info to {repo_info_path}")
-
-        commits_path = os.path.join(repo_data_dir, "commits.json")
+        
+        commits_path = os.path.join(repo_data_dir, "repo_data.json")
         with open(commits_path, "w", encoding="utf-8") as f:
-            json.dump(commits, f, indent=4)
-        logging.info(f"Saved commits to {commits_path}")
+            json.dump(logs, f, indent=4)
+        logging.info(f"Saved logs to {commits_path}")
 
-        file_index_path = os.path.join(repo_data_dir, "file_index.json")
-        with open(file_index_path, "w", encoding="utf-8") as f:
-            json.dump(file_index, f, indent=4)
-        logging.info(f"Saved file index to {file_index_path}")
-
+        
         logging.info(f"Successfully saved all data for {repo_name}")
 
     except Exception as e:
