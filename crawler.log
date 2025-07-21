@@ -1,0 +1,20 @@
+2025-07-21 13:43:11,243 INFO: Ensured data directory exists: fivekdataset/test_group/test_repo
+2025-07-21 13:43:11,250 INFO: Stored 6 code files from /var/folders/35/2pz7vhmd2tbdwb73n7k07j7c0000gn/T/test_repo_bci0y_9g
+2025-07-21 13:43:11,250 INFO: Stored 2 log entries for test_repo
+2025-07-21 13:43:11,251 INFO: Successfully saved all data for test_repo to HDF5 format at fivekdataset/test_group/test_repo/test_repo.h5
+2025-07-21 13:43:31,022 INFO: Ensured data directory exists: fivekdataset/test_group/test_repo
+2025-07-21 13:43:31,049 INFO: Stored 6 code files from /var/folders/35/2pz7vhmd2tbdwb73n7k07j7c0000gn/T/test_repo_ia_0fs0p
+2025-07-21 13:43:31,060 INFO: Stored 6 log entries for test_repo
+2025-07-21 13:43:31,081 INFO: Successfully saved all data for test_repo to HDF5 format at fivekdataset/test_group/test_repo/test_repo.h5
+2025-07-21 13:43:49,184 INFO: Ensured data directory exists: fivekdataset/test_group/test_repo
+2025-07-21 13:43:49,192 INFO: Stored 6 code files from /var/folders/35/2pz7vhmd2tbdwb73n7k07j7c0000gn/T/test_repo_zc19uhah
+2025-07-21 13:43:49,192 INFO: Stored 10 log entries for test_repo
+2025-07-21 13:43:49,193 INFO: Successfully saved all data for test_repo to HDF5 format at fivekdataset/test_group/test_repo/test_repo.h5
+2025-07-21 13:44:44,116 INFO: Ensured data directory exists: fivekdataset/test_group/test_repo
+2025-07-21 13:44:44,123 INFO: Stored 6 code files from /var/folders/35/2pz7vhmd2tbdwb73n7k07j7c0000gn/T/test_repo_5vrt8mrp
+2025-07-21 13:44:44,123 INFO: Stored 14 log entries for test_repo
+2025-07-21 13:44:44,124 INFO: Successfully saved all data for test_repo to HDF5 format at fivekdataset/test_group/test_repo/test_repo.h5
+2025-07-21 13:45:32,091 INFO: Ensured data directory exists: /var/folders/35/2pz7vhmd2tbdwb73n7k07j7c0000gn/T/hdf5_test_oe72er7_/test_group/test_repo
+2025-07-21 13:45:32,099 INFO: Stored 6 code files from /var/folders/35/2pz7vhmd2tbdwb73n7k07j7c0000gn/T/test_repo_og349zvr
+2025-07-21 13:45:32,100 INFO: Stored 18 log entries for test_repo
+2025-07-21 13:45:32,101 INFO: Successfully saved all data for test_repo to HDF5 format at /var/folders/35/2pz7vhmd2tbdwb73n7k07j7c0000gn/T/hdf5_test_oe72er7_/test_group/test_repo/test_repo.h5

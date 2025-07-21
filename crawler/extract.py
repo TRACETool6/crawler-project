@@ -62,19 +62,29 @@ def extract_commits(repo_path):
         logging.error(f"Error extracting commits from {repo_path}: {e}")
     return commits
 
-'''def extract_file_index(repo_path):
+def extract_file_contents(repo_path):
     """
-    Extracts a file index (path and size) for all files in a repository,
-    excluding the .git directory.
+    Extracts file contents for code files in a repository,
+    excluding the .git directory and binary files.
 
     Args:
         repo_path (str): The local path to the cloned repository.
 
     Returns:
-        list: A list of dictionaries, each with 'path' and 'size' of a file.
+        dict: A dictionary mapping file paths to their contents.
     """
-    logging.info(f"Extracting file index from {repo_path}")
-    index = []
+    logging.info(f"Extracting file contents from {repo_path}")
+    file_contents = {}
+    
+    # Define file extensions to include (common code file types)
+    code_extensions = {
+        '.py', '.js', '.ts', '.java', '.cpp', '.c', '.h', '.hpp', '.cs', '.go',
+        '.rs', '.php', '.rb', '.swift', '.kt', '.scala', '.clj', '.hs', '.ml',
+        '.r', '.m', '.sh', '.bash', '.zsh', '.ps1', '.sql', '.html', '.css',
+        '.xml', '.json', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf',
+        '.md', '.txt', '.rst', '.tex', '.dockerfile', '.makefile', '.cmake'
+    }
+    
     try:
         for root, dirs, files in os.walk(repo_path):
             if ".git" in dirs:
@@ -83,12 +93,22 @@ def extract_commits(repo_path):
             for f in files:
                 abs_path = os.path.join(root, f)
                 rel_path = os.path.relpath(abs_path, repo_path)
-                try:
-                    size = os.path.getsize(abs_path)
-                    index.append({"path": rel_path, "size": size})
-                except OSError as e:
-                    logging.warning(f"Could not get size for {abs_path}: {e}")
-        logging.info(f"Finished extracting {len(index)} files for index from {repo_path}")
+                
+                # Get file extension
+                _, ext = os.path.splitext(f.lower())
+                
+                # Only include code files and common text files
+                if ext in code_extensions or f.lower() in ['readme', 'license', 'changelog', 'makefile', 'dockerfile']:
+                    try:
+                        with open(abs_path, 'r', encoding='utf-8', errors='ignore') as file:
+                            content = file.read()
+                            file_contents[rel_path] = content
+                    except (UnicodeDecodeError, IOError, OSError) as e:
+                        logging.warning(f"Could not read file {abs_path}: {e}")
+                        continue
+        
+        logging.info(f"Finished extracting {len(file_contents)} files from {repo_path}")
     except Exception as e:
-        logging.error(f"Error extracting file index from {repo_path}: {e}")
-    return index'''
+        logging.error(f"Error extracting file contents from {repo_path}: {e}")
+    
+    return file_contents
