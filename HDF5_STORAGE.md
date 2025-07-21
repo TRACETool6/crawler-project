@@ -243,21 +243,4 @@ python -c "import h5py; h5py.File('repository.h5', 'r')"
 h5dump repository.h5
 ```
 
-## Future Enhancements
 
-Potential improvements for the HDF5 storage system:
-
-1. **Compression Tuning**: Optimize compression settings for different file types
-2. **Indexing**: Add search indices for faster querying
-3. **Incremental Updates**: Support for updating existing HDF5 files
-4. **Parallel Processing**: Leverage HDF5's parallel I/O capabilities
-5. **Schema Versioning**: Version the HDF5 schema for backward compatibility
-
-## Support
-
-For issues or questions regarding the HDF5 storage functionality:
-
-1. Check this documentation
-2. Run the test script to verify your installation
-3. Use the explorer utility to debug file issues
-4. Check the crawler logs for error messages
