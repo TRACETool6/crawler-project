@@ -22,8 +22,8 @@ def clone_repo(full_name):
         logging.info(f"Repository {full_name} already exists at {path}. Skipping clone.")
         return path, folder_name
 
-    logging.info(f"Attempting to clone {full_name} to {path}")
-    git.Repo.clone_from(f"https://github.com/{full_name}.git", path, bare=True)
+    logging.info(f"Attempting to deep clone {full_name} to {path}")
+    git.Repo.clone_from(f"https://github.com/{full_name}.git", path)
     logging.info(f"Successfully cloned {full_name} to {path}")
     return path, folder_name
     '''repo_name = full_name.split("/")[-1]

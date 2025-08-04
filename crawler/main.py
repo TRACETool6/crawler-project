@@ -5,7 +5,7 @@ import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from clone import clone_repo
 from github_api import get_repo_batch, fetch_all_metadata
-from extract import extract_commits
+from extract import extract_commits, extract_file_index
 from storage import save_repo_data, mark_as_crawled
 from config import BASE_PATH, CRAWLED_DB_PATH, BATCH_SIZE, GROUP_NAME, ensure_dirs, load_crawled_repos
 
@@ -16,7 +16,7 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-TARGET_REPOS = 1000
+TARGET_REPOS = None  
 MAX_CLONE_THREADS = 10
 MAX_PROCESS_WORKERS = os.cpu_count() or 4
 MAX_RETRIES = 3
@@ -50,13 +50,15 @@ def process_repo_data(full_name):
         if not commits:
             logging.warning(f"No commits for {full_name}")
 
-        
+        file_index = extract_file_index(repo_path)
+        if not file_index:
+            logging.warning(f"No files found for {full_name}")
 
         repo_metadata = fetch_all_metadata(owner, repo_name_part)
         if not repo_metadata:
             logging.warning(f"No metadata for {full_name}")
 
-        save_repo_data(GROUP_NAME, repo_name, repo_metadata, commits, {}, repo_path)
+        save_repo_data(GROUP_NAME, repo_name, repo_metadata, commits, file_index, repo_path)
         mark_as_crawled(full_name)
         remove_repo_folder(repo_path)
 
@@ -66,26 +68,20 @@ def process_repo_data(full_name):
 
 
 def crawl_loop():
-    logging.info(f"Starting crawl for {TARGET_REPOS} repos")
+    logging.info(f"Starting continuous crawl (no limit on number of repos)")
     ensure_dirs()
 
     while True:
         seen_repos = load_crawled_repos()
         current_count = len(seen_repos)
-        if current_count >= TARGET_REPOS:
-            logging.info("Target reached. Stopping crawl.")
-            break
-
-        to_fetch = min(BATCH_SIZE, TARGET_REPOS - current_count)
-        if to_fetch <= 0:
-            break
-
-        repos_to_process = get_repo_batch(seen_repos, to_fetch)
+        
+        repos_to_process = get_repo_batch(seen_repos, BATCH_SIZE)
         if not repos_to_process:
-            logging.warning("No new repos. Waiting.")
+            logging.warning("No new repos found in this batch. Waiting before retrying.")
             time.sleep(60)
             continue
 
+        logging.info(f"Processing batch of {len(repos_to_process)} repositories. Total processed so far: {current_count}")
         
         with ProcessPoolExecutor(max_workers=MAX_PROCESS_WORKERS) as executor:
             futures = [executor.submit(process_repo_data, full_name)
@@ -93,7 +89,7 @@ def crawl_loop():
             for future in as_completed(futures):
                 future.result()  
 
-        logging.info("Batch done. Pausing before next.")
+        logging.info("Batch completed. Pausing before next batch.")
         time.sleep(5)
 
     logging.info("Crawling complete.")

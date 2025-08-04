@@ -2,6 +2,7 @@ import os
 import json
 import sqlite3
 import logging
+import shutil
 
 logging.basicConfig(
     filename="crawler.log",
@@ -18,11 +19,47 @@ except ImportError:
     CRAWLED_DB_PATH = "crawler_db.sqlite"
 
 
+def copy_repo_files(repo_path, destination_path):
+    """
+    Copies all repository files to the destination directory, excluding .git folder.
+    
+    Args:
+        repo_path (str): The source repository path.
+        destination_path (str): The destination directory path.
+    """
+    try:
+        os.makedirs(destination_path, exist_ok=True)
+        
+        for root, dirs, files in os.walk(repo_path):
+            if ".git" in dirs:
+                dirs.remove(".git")
+            
+            rel_root = os.path.relpath(root, repo_path)
+            if rel_root == '.':
+                dest_root = destination_path
+            else:
+                dest_root = os.path.join(destination_path, rel_root)
+            
+            os.makedirs(dest_root, exist_ok=True)
+            
+            for file in files:
+                src_file = os.path.join(root, file)
+                dest_file = os.path.join(dest_root, file)
+                try:
+                    shutil.copy2(src_file, dest_file)
+                except (OSError, IOError) as e:
+                    logging.warning(f"Could not copy file {src_file} to {dest_file}: {e}")
+        
+        logging.info(f"Successfully copied repository files from {repo_path} to {destination_path}")
+        
+    except Exception as e:
+        logging.error(f"Error copying repository files from {repo_path} to {destination_path}: {e}")
 
 
 def save_repo_data(group_name, repo_name, repo_info, commits, file_index, repo_path):
     """
-    Saves the extracted repository data (info, commits, file index) to JSON files.
+    Saves the extracted repository data (info, commits, file index) to JSON files
+    and copies all repository files to the storage directory.
 
     Args:
         group_name (str): The name of the group/category for the repository.
@@ -37,18 +74,22 @@ def save_repo_data(group_name, repo_name, repo_info, commits, file_index, repo_p
         logs = {}
         logs["commitLog"] = commits
         logs["metadataLog"] = repo_info
+        logs["fileIndex"] = file_index
+        
         repo_data_dir = os.path.join(BASE_PATH, group_name, repo_name)
         os.makedirs(repo_data_dir, exist_ok=True)
         logging.info(f"Ensured data directory exists: {repo_data_dir}")
 
-        
-        commits_path = os.path.join(repo_data_dir, "repo_data.json")
-        with open(commits_path, "w", encoding="utf-8") as f:
+        repo_data_path = os.path.join(repo_data_dir, "repo_data.json")
+        with open(repo_data_path, "w", encoding="utf-8") as f:
             json.dump(logs, f, indent=4)
-        logging.info(f"Saved logs to {commits_path}")
+        logging.info(f"Saved repository data to {repo_data_path}")
 
+        # Copy all repository files to the storage directory
+        repo_files_dir = os.path.join(repo_data_dir, "files")
+        copy_repo_files(repo_path, repo_files_dir)
         
-        logging.info(f"Successfully saved all data for {repo_name}")
+        logging.info(f"Successfully saved all data and files for {repo_name}")
 
     except Exception as e:
         logging.error(f"Error saving data for {repo_name}: {e}")

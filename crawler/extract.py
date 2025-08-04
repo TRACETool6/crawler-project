@@ -62,7 +62,7 @@ def extract_commits(repo_path):
         logging.error(f"Error extracting commits from {repo_path}: {e}")
     return commits
 
-'''def extract_file_index(repo_path):
+def extract_file_index(repo_path):
     """
     Extracts a file index (path and size) for all files in a repository,
     excluding the .git directory.
@@ -91,4 +91,4 @@ def extract_commits(repo_path):
         logging.info(f"Finished extracting {len(index)} files for index from {repo_path}")
     except Exception as e:
         logging.error(f"Error extracting file index from {repo_path}: {e}")
-    return index'''
+    return index
