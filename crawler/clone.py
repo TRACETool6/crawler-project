@@ -26,20 +26,7 @@ def clone_repo(full_name):
     git.Repo.clone_from(f"https://github.com/{full_name}.git", path, bare=True)
     logging.info(f"Successfully cloned {full_name} to {path}")
     return path, folder_name
-    '''repo_name = full_name.split("/")[-1]
-    repo_path = os.path.join(BASE_PATH, repo_name)
-
-    if os.path.exists(repo_path):
-        logging.info(f"Repo already exists: {repo_name}")
-        return repo_path, repo_name
-
-    url = f"https://github.com/{full_name}.git"
-    try:
-        subprocess.run(["git", "clone", "--depth=1", url, repo_path], check=True)
-        return repo_path, repo_name
-    except subprocess.CalledProcessError as e:
-        logging.warning(f"Failed to clone {full_name}: {e}")
-        return None, None'''
+    
 
 
 def retry_clone_repo(full_name, retries=MAX_RETRIES):

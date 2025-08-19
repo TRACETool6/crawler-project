@@ -64,8 +64,7 @@ def save_repo_data(group_name, repo_name, repo_info, commits, file_index, repo_p
             # Store code files from the repository
             _store_codebase(codebase_group, repo_path)
             
-            # Store crawler logs specific to this repository
-            _store_repository_logs(logs_group, repo_name)
+
             
             # Add creation timestamp
             h5file.attrs["created_at"] = datetime.now().isoformat()
@@ -109,31 +108,8 @@ def _store_commits(group, commits):
     commits_json = json.dumps(commits, indent=2)
     group.create_dataset("commits_data", data=commits_json, dtype=h5py.string_dtype())
     
-    # Extract key commit metrics for analysis
-    if commits:
-        shas = [commit.get("sha", "") for commit in commits]
-        authors = [commit.get("author", {}).get("name", "") for commit in commits]
-        dates = [commit.get("author_date", "") for commit in commits]
-        messages = [commit.get("message", "")[:200] for commit in commits]  # Truncate long messages
-        
-        # Store as separate datasets
-        group.create_dataset("commit_shas", data=shas, dtype=h5py.string_dtype())
-        group.create_dataset("authors", data=authors, dtype=h5py.string_dtype())
-        group.create_dataset("dates", data=dates, dtype=h5py.string_dtype())
-        group.create_dataset("messages", data=messages, dtype=h5py.string_dtype())
-        
-        # Store commit statistics
-        total_commits = len(commits)
-        total_files_changed = sum(commit.get("total_files_changed", 0) for commit in commits)
-        total_lines_added = sum(commit.get("total_lines_added", 0) for commit in commits)
-        total_lines_deleted = sum(commit.get("total_lines_deleted", 0) for commit in commits)
-        
-        stats_group = group.create_group("statistics")
-        stats_group.create_dataset("total_commits", data=total_commits)
-        stats_group.create_dataset("total_files_changed", data=total_files_changed)
-        stats_group.create_dataset("total_lines_added", data=total_lines_added)
-        stats_group.create_dataset("total_lines_deleted", data=total_lines_deleted)
-
+    
+    
 
 def _store_codebase(group, repo_path):
     """Store code files from the repository in HDF5 group."""
@@ -166,7 +142,7 @@ def _store_codebase(group, repo_path):
                 _, ext = os.path.splitext(file.lower())
                 
                 # Only store code files and common text files
-                if ext in code_extensions or file.lower() in ['readme', 'license', 'changelog', 'makefile', 'dockerfile']:
+                if ext:
                     try:
                         # Read file content
                         with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -184,17 +160,13 @@ def _store_codebase(group, repo_path):
                         
                         files_stored += 1
                         
-                        # Limit to prevent extremely large files
-                        if files_stored >= 1000:  # Reasonable limit
-                            logging.warning(f"Reached file limit (1000) for repository at {repo_path}")
-                            break
+                        
                             
                     except (UnicodeDecodeError, IOError, OSError) as e:
                         logging.warning(f"Could not read file {file_path}: {e}")
                         continue
             
-            if files_stored >= 1000:
-                break
+            
     
     except Exception as e:
         logging.error(f"Error storing codebase from {repo_path}: {e}")
