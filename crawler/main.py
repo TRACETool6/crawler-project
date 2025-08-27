@@ -5,7 +5,7 @@ import time
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from clone import clone_repo
 from github_api import get_repo_batch, fetch_all_metadata
-from extract import extract_commits
+from extract import extract_commits, extract_malicious_keywords
 from storage import save_repo_data, mark_as_crawled
 from config import BASE_PATH, CRAWLED_DB_PATH, BATCH_SIZE, GROUP_NAME, ensure_dirs, load_crawled_repos
 
@@ -50,13 +50,16 @@ def process_repo_data(full_name):
         if not commits:
             logging.warning(f"No commits for {full_name}")
 
+        # Extract malicious keywords from repository source code
+        keywords_data = extract_malicious_keywords(repo_path)
+        if not keywords_data:
+            logging.warning(f"No keywords extracted for {full_name}")
         
-
         repo_metadata = fetch_all_metadata(owner, repo_name_part)
         if not repo_metadata:
             logging.warning(f"No metadata for {full_name}")
 
-        save_repo_data(GROUP_NAME, repo_name, repo_metadata, commits, {}, repo_path)
+        save_repo_data(GROUP_NAME, repo_name, repo_metadata, commits, keywords_data, repo_path)
         mark_as_crawled(full_name)
         remove_repo_folder(repo_path)
 

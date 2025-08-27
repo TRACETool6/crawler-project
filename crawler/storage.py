@@ -23,9 +23,9 @@ except ImportError:
 
 
 
-def save_repo_data(group_name, repo_name, repo_info, commits, file_index, repo_path, base_path=None):
+def save_repo_data(group_name, repo_name, repo_info, commits, keywords_data, repo_path, base_path=None):
     """
-    Saves the extracted repository data (info, commits, file index) to HDF5 format.
+    Saves the extracted repository data (info, commits, keywords, file index) to HDF5 format.
     Also stores the actual code files and logs in the same HDF5 file.
 
     Args:
@@ -33,7 +33,7 @@ def save_repo_data(group_name, repo_name, repo_info, commits, file_index, repo_p
         repo_name (str): The name of the repository (e.g., 'owner_repo').
         repo_info (dict): General information about the repository.
         commits (list): A list of dictionaries, each representing a commit.
-        file_index (list): A list of dictionaries, each representing a file in the repository.
+        keywords_data (dict): Dictionary containing extracted keywords and analysis.
         repo_path (str): The local path where the repository was cloned.
         base_path (str, optional): Override the default BASE_PATH for output location.
     """
@@ -53,6 +53,7 @@ def save_repo_data(group_name, repo_name, repo_info, commits, file_index, repo_p
             metadata_group = h5file.create_group("metadata")
             commits_group = h5file.create_group("commits")
             codebase_group = h5file.create_group("codebase")
+            keywords_group = h5file.create_group("keywords")
             logs_group = h5file.create_group("logs")
             
             # Store repository metadata
@@ -60,6 +61,9 @@ def save_repo_data(group_name, repo_name, repo_info, commits, file_index, repo_p
             
             # Store commits information
             _store_commits(commits_group, commits)
+            
+            # Store keywords analysis
+            _store_keywords(keywords_group, keywords_data)
             
             # Store code files from the repository
             _store_codebase(codebase_group, repo_path)
@@ -109,7 +113,34 @@ def _store_commits(group, commits):
     group.create_dataset("commits_data", data=commits_json, dtype=h5py.string_dtype())
     
     
+def _store_keywords(group, keywords_data):
+    """Store keyword analysis data in HDF5 group."""
+    if not keywords_data:
+        return
     
+    # Store full keywords analysis as JSON
+    keywords_json = json.dumps(keywords_data, indent=2)
+    group.create_dataset("keywords_analysis", data=keywords_json, dtype=h5py.string_dtype())
+    
+    # Store key metrics as separate datasets for easy access
+    if isinstance(keywords_data, dict):
+        # Store summary statistics
+        for key in ["total_files_processed", "total_keywords_extracted", "unique_keywords", 
+                   "filtered_keywords_count", "malicious_score"]:
+            if key in keywords_data:
+                value = keywords_data[key]
+                if isinstance(value, (int, float)):
+                    group.create_dataset(key, data=value)
+        
+        # Store malicious keywords as separate dataset
+        if "malicious_keywords" in keywords_data and keywords_data["malicious_keywords"]:
+            malicious_keywords_json = json.dumps(keywords_data["malicious_keywords"], indent=2)
+            group.create_dataset("malicious_keywords", data=malicious_keywords_json, dtype=h5py.string_dtype())
+        
+        # Store top keywords for quick access
+        if "top_keywords" in keywords_data and keywords_data["top_keywords"]:
+            top_keywords_json = json.dumps(keywords_data["top_keywords"], indent=2)
+            group.create_dataset("top_keywords", data=top_keywords_json, dtype=h5py.string_dtype())
 
 def _store_codebase(group, repo_path):
     """Store code files from the repository in HDF5 group."""
@@ -240,6 +271,27 @@ def read_repo_hdf5(hdf5_path):
                     for key in commits_group['statistics'].keys():
                         stats[key] = commits_group['statistics'][key][()]
                     data['commit_statistics'] = stats
+            
+            # Read keywords analysis
+            if 'keywords' in h5file:
+                keywords_group = h5file['keywords']
+                if 'keywords_analysis' in keywords_group:
+                    keywords_json = keywords_group['keywords_analysis'][()].decode('utf-8')
+                    data['keywords'] = json.loads(keywords_json)
+                
+                # Read key metrics
+                keyword_metrics = {}
+                for key in ["total_files_processed", "total_keywords_extracted", "unique_keywords", 
+                           "filtered_keywords_count", "malicious_score"]:
+                    if key in keywords_group:
+                        keyword_metrics[key] = keywords_group[key][()]
+                if keyword_metrics:
+                    data['keyword_metrics'] = keyword_metrics
+                
+                # Read malicious keywords
+                if 'malicious_keywords' in keywords_group:
+                    malicious_json = keywords_group['malicious_keywords'][()].decode('utf-8')
+                    data['malicious_keywords'] = json.loads(malicious_json)
             
             # Read file information (not content, just metadata)
             if 'codebase' in h5file and 'files' in h5file['codebase']:

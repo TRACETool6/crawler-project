@@ -1,6 +1,7 @@
 import os
 import git
 import logging
+from keyword_extractor import MaliciousKeywordExtractor
 
 logging.basicConfig(
     filename="crawler.log",
@@ -112,3 +113,43 @@ def extract_file_contents(repo_path):
         logging.error(f"Error extracting file contents from {repo_path}: {e}")
     
     return file_contents
+
+
+def extract_malicious_keywords(repo_path):
+    """
+    Extracts and analyzes malicious-oriented keywords from repository source code files.
+    
+    This function implements the methodology described in academic papers on malicious
+    repository detection, extracting keywords from source code and applying frequency-based
+    filtering to identify potentially malicious terms.
+    
+    Args:
+        repo_path (str): The local path to the cloned repository.
+    
+    Returns:
+        dict: A dictionary containing:
+            - keyword_frequency: Dictionary of keyword frequencies
+            - malicious_keywords: Dictionary of potentially malicious keywords
+            - malicious_score: Float score (0-1) indicating malicious orientation
+            - total_files_processed: Number of files analyzed
+            - total_keywords_extracted: Total number of keywords found
+            - unique_keywords: Number of unique keywords
+    """
+    logging.info(f"Extracting malicious keywords from {repo_path}")
+    
+    try:
+        extractor = MaliciousKeywordExtractor()
+        keywords_data = extractor.extract_keywords_from_repository(repo_path)
+        
+        if keywords_data:
+            logging.info(f"Keyword extraction completed for {repo_path}:")
+            logging.info(f"  - Total keywords: {keywords_data.get('total_keywords_extracted', 0)}")
+            logging.info(f"  - Unique keywords: {keywords_data.get('unique_keywords', 0)}")
+            logging.info(f"  - Malicious keywords: {len(keywords_data.get('malicious_keywords', {}))}")
+            logging.info(f"  - Malicious score: {keywords_data.get('malicious_score', 0)}")
+        
+        return keywords_data
+        
+    except Exception as e:
+        logging.error(f"Error extracting malicious keywords from {repo_path}: {e}")
+        return {}

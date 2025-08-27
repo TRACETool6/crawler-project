@@ -18,3 +18,11 @@
 2025-07-21 13:45:32,099 INFO: Stored 6 code files from /var/folders/35/2pz7vhmd2tbdwb73n7k07j7c0000gn/T/test_repo_og349zvr
 2025-07-21 13:45:32,100 INFO: Stored 18 log entries for test_repo
 2025-07-21 13:45:32,101 INFO: Successfully saved all data for test_repo to HDF5 format at /var/folders/35/2pz7vhmd2tbdwb73n7k07j7c0000gn/T/hdf5_test_oe72er7_/test_group/test_repo/test_repo.h5
+2025-08-26 18:09:59,373 INFO: Extracting keywords from repository: fivekdataset/test_group/test_repo
+2025-08-26 18:09:59,373 INFO: Extracted 0 total keywords (0 unique) from 0 files
+2025-08-26 18:09:59,373 INFO: Filtered to 0 significant keywords
+2025-08-26 18:09:59,374 INFO: Identified 0 potentially malicious keywords
+2025-08-26 18:10:48,497 INFO: Extracting keywords from repository: /var/folders/35/2pz7vhmd2tbdwb73n7k07j7c0000gn/T/test_malware_T2oLVn
+2025-08-26 18:10:48,498 INFO: Extracted 23 total keywords (10 unique) from 1 files
+2025-08-26 18:10:48,498 INFO: Filtered to 5 significant keywords
+2025-08-26 18:10:48,498 INFO: Identified 5 potentially malicious keywords
