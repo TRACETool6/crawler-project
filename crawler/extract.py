@@ -153,3 +153,53 @@ def extract_malicious_keywords(repo_path):
     except Exception as e:
         logging.error(f"Error extracting malicious keywords from {repo_path}: {e}")
         return {}
+
+
+def extract_comprehensive_security_analysis(repo_path):
+    """
+    Perform comprehensive security analysis using keywords, YARA rules, and vulnerability scanning.
+    
+    This function combines multiple security analysis techniques:
+    1. Keyword-based malicious pattern detection
+    2. YARA rule pattern matching  
+    3. Static vulnerability analysis
+    
+    Args:
+        repo_path (str): The local path to the cloned repository.
+    
+    Returns:
+        dict: A dictionary containing comprehensive security analysis results including:
+            - keyword_analysis: Malicious keyword detection results
+            - yara_analysis: YARA pattern matching results
+            - vulnerability_analysis: Static vulnerability scan results
+            - combined_assessment: Overall security assessment and recommendations
+    """
+    logging.info(f"Extracting comprehensive security analysis from {repo_path}")
+    
+    try:
+        from enhanced_analyzer import analyze_repository_comprehensive
+        
+        # Perform comprehensive analysis with medium vulnerability threshold
+        analysis_results = analyze_repository_comprehensive(
+            repo_path, 
+            vulnerability_threshold='medium'
+        )
+        
+        if analysis_results:
+            combined_assessment = analysis_results.get('combined_assessment', {})
+            logging.info(f"Comprehensive security analysis completed for {repo_path}:")
+            logging.info(f"  - Combined risk score: {combined_assessment.get('combined_score', 0)}")
+            logging.info(f"  - Risk level: {combined_assessment.get('risk_level', 'UNKNOWN')}")
+            logging.info(f"  - Confidence: {combined_assessment.get('confidence', 0)}")
+            logging.info(f"  - Threat indicators: {len(combined_assessment.get('threat_indicators', []))}")
+        
+        return analysis_results
+        
+    except ImportError as e:
+        logging.warning(f"Enhanced analyzer not available, falling back to keyword-only analysis: {e}")
+        # Fallback to keyword-only analysis
+        return extract_malicious_keywords(repo_path)
+        
+    except Exception as e:
+        logging.error(f"Error extracting comprehensive security analysis from {repo_path}: {e}")
+        return {}
