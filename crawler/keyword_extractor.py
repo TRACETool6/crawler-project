@@ -257,14 +257,8 @@ class MaliciousKeywordExtractor:
                     # Only process code files
                     if ext in self.code_extensions or filename.lower() in ['makefile', 'dockerfile', 'readme']:
                         try:
-                            with open(file_path, 'r') as f:
+                            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
                                 content = f.read()
-                                # Decode to unicode if we're in Python 2
-                                if isinstance(content, str):
-                                    try:
-                                        content = content.decode('utf-8', errors='ignore')
-                                    except UnicodeDecodeError:
-                                        content = content.decode('latin-1', errors='ignore')
                             
                             file_keywords = self.extract_keywords_from_code(content, ext)
                             all_keywords.extend(file_keywords)
