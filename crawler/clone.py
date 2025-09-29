@@ -23,7 +23,7 @@ def clone_repo(full_name):
         return path, folder_name
 
     logging.info(f"Attempting to clone {full_name} to {path}")
-    git.Repo.clone_from(f"https://github.com/{full_name}.git", path, bare=True)
+    git.Repo.clone_from(f"https://github.com/{full_name}.git", path)
     logging.info(f"Successfully cloned {full_name} to {path}")
     return path, folder_name
     
