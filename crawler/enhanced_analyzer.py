@@ -132,19 +132,19 @@ class EnhancedSecurityAnalyzer:
         # Determine overall risk level
         risk_level = self._determine_risk_level(combined_score, yara_categories, vuln_critical, vuln_high)
         
-        # Generate threat indicators
+        # Generate threat indicators with more conservative thresholds
         threat_indicators = []
-        if keyword_malicious_count > 5:
+        if keyword_malicious_count > 10:  # Increased threshold
             threat_indicators.append(f"High number of malicious keywords ({keyword_malicious_count})")
-        if yara_matches > 3:
+        if yara_matches > 5:  # Increased threshold
             threat_indicators.append(f"Multiple YARA rule matches ({yara_matches})")
-        if 'ransomware' in yara_categories:
+        if 'ransomware' in yara_categories and combined_score > 0.2:  # Require context
             threat_indicators.append("Ransomware patterns detected")
-        if 'backdoor' in yara_categories:
+        if 'backdoor' in yara_categories and combined_score > 0.2:  # Require context
             threat_indicators.append("Backdoor patterns detected") 
-        if vuln_critical > 0:
+        if vuln_critical > 0:  # More than 1 critical
             threat_indicators.append(f"Critical vulnerabilities found ({vuln_critical})")
-        if vuln_high > 2:
+        if vuln_high > 5:  # Increased threshold
             threat_indicators.append(f"Multiple high-severity vulnerabilities ({vuln_high})")
         
         # Generate recommendations
@@ -179,17 +179,20 @@ class EnhancedSecurityAnalyzer:
                             vuln_critical: int, vuln_high: int) -> str:
         """Determine overall risk level based on multiple factors."""
         
-        # Automatic critical if certain conditions are met
-        if vuln_critical > 0 or 'ransomware' in yara_categories:
+        # More conservative thresholds to reduce false positives
+        
+        # Automatic critical only for very strong indicators
+        if vuln_critical > 2 or ('ransomware' in yara_categories and combined_score > 0.3):
             return "CRITICAL"
         
-        if combined_score >= 0.8:
+        # High risk requires strong evidence
+        if combined_score >= 0.7:
             return "CRITICAL"
-        elif combined_score >= 0.6 or ('backdoor' in yara_categories) or vuln_high > 3:
+        elif combined_score >= 0.5 or (('backdoor' in yara_categories or 'trojan' in yara_categories) and combined_score > 0.2):
             return "HIGH"
-        elif combined_score >= 0.4 or len(yara_categories) > 2 or vuln_high > 0:
+        elif combined_score >= 0.3 or (vuln_high > 5 and combined_score > 0.1):
             return "MEDIUM" 
-        elif combined_score >= 0.2:
+        elif combined_score >= 0.15:
             return "LOW"
         else:
             return "MINIMAL"

@@ -23,9 +23,9 @@ except ImportError:
 
 
 
-def save_repo_data(group_name, repo_name, repo_info, commits, keywords_data, repo_path, base_path=None):
+def save_repo_data(group_name, repo_name, repo_info, commits, file_index, repo_path, base_path=None):
     """
-    Saves the extracted repository data (info, commits, keywords, file index) to HDF5 format.
+    Saves the extracted repository data (info, commits, file index) to HDF5 format.
     Also stores the actual code files and logs in the same HDF5 file.
 
     Args:
@@ -33,7 +33,7 @@ def save_repo_data(group_name, repo_name, repo_info, commits, keywords_data, rep
         repo_name (str): The name of the repository (e.g., 'owner_repo').
         repo_info (dict): General information about the repository.
         commits (list): A list of dictionaries, each representing a commit.
-        keywords_data (dict): Dictionary containing extracted keywords and analysis.
+        file_index (list): A list of dictionaries, each representing a file in the repository.
         repo_path (str): The local path where the repository was cloned.
         base_path (str, optional): Override the default BASE_PATH for output location.
     """
@@ -53,7 +53,6 @@ def save_repo_data(group_name, repo_name, repo_info, commits, keywords_data, rep
             metadata_group = h5file.create_group("metadata")
             commits_group = h5file.create_group("commits")
             codebase_group = h5file.create_group("codebase")
-            keywords_group = h5file.create_group("keywords")
             logs_group = h5file.create_group("logs")
             
             # Store repository metadata
@@ -61,9 +60,6 @@ def save_repo_data(group_name, repo_name, repo_info, commits, keywords_data, rep
             
             # Store commits information
             _store_commits(commits_group, commits)
-            
-            # Store keywords analysis
-            _store_keywords(keywords_group, keywords_data)
             
             # Store code files from the repository
             _store_codebase(codebase_group, repo_path)
@@ -113,55 +109,20 @@ def _store_commits(group, commits):
     group.create_dataset("commits_data", data=commits_json, dtype=h5py.string_dtype())
     
     
-def _store_keywords(group, keywords_data):
-    """Store keyword analysis data in HDF5 group."""
-    if not keywords_data:
-        return
     
-    # Store full keywords analysis as JSON
-    keywords_json = json.dumps(keywords_data, indent=2)
-    group.create_dataset("keywords_analysis", data=keywords_json, dtype=h5py.string_dtype())
-    
-    # Store key metrics as separate datasets for easy access
-    if isinstance(keywords_data, dict):
-        # Store summary statistics
-        for key in ["total_files_processed", "total_keywords_extracted", "unique_keywords", 
-                   "filtered_keywords_count", "malicious_score"]:
-            if key in keywords_data:
-                value = keywords_data[key]
-                if isinstance(value, (int, float)):
-                    group.create_dataset(key, data=value)
-        
-        # Store malicious keywords as separate dataset
-        if "malicious_keywords" in keywords_data and keywords_data["malicious_keywords"]:
-            malicious_keywords_json = json.dumps(keywords_data["malicious_keywords"], indent=2)
-            group.create_dataset("malicious_keywords", data=malicious_keywords_json, dtype=h5py.string_dtype())
-        
-        # Store top keywords for quick access
-        if "top_keywords" in keywords_data and keywords_data["top_keywords"]:
-            top_keywords_json = json.dumps(keywords_data["top_keywords"], indent=2)
-            group.create_dataset("top_keywords", data=top_keywords_json, dtype=h5py.string_dtype())
 
 def _store_codebase(group, repo_path):
     """Store code files from the repository in HDF5 group."""
     if not repo_path or not os.path.exists(repo_path):
         return
     
-    # Define file extensions to include (common code and text file types)
-    text_extensions = {
+    # Define file extensions to include (common code file types)
+    code_extensions = {
         '.py', '.js', '.ts', '.java', '.cpp', '.c', '.h', '.hpp', '.cs', '.go',
         '.rs', '.php', '.rb', '.swift', '.kt', '.scala', '.clj', '.hs', '.ml',
         '.r', '.m', '.sh', '.bash', '.zsh', '.ps1', '.sql', '.html', '.css',
         '.xml', '.json', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf',
-        '.md', '.txt', '.rst', '.tex', '.dockerfile', '.makefile', '.cmake',
-        '.rtf', '.log', '.gitignore', '.license', '.copying', ''  # Include files without extension
-    }
-    
-    # Binary file extensions to handle specially
-    binary_extensions = {
-        '.exe', '.bin', '.dll', '.so', '.dylib', '.jar', '.class', '.pyc',
-        '.zip', '.tar', '.gz', '.7z', '.rar', '.pdf', '.doc', '.docx',
-        '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.ico', '.svg'
+        '.md', '.txt', '.rst', '.tex', '.dockerfile', '.makefile', '.cmake'
     }
     
     files_stored = 0
@@ -177,78 +138,35 @@ def _store_codebase(group, repo_path):
                 file_path = os.path.join(root, file)
                 rel_path = os.path.relpath(file_path, repo_path)
                 
-                # Get file extension (handle files without extensions)
+                # Get file extension
                 _, ext = os.path.splitext(file.lower())
-                if not ext:
-                    ext = ''  # Files without extension
                 
-                # Create a safe name for HDF5 dataset (replace special characters)
-                safe_name = rel_path.replace('/', '_').replace('\\', '_').replace('.', '_dot_').replace(' ', '_')
-                
-                try:
-                    # Get file size
-                    file_size = os.path.getsize(file_path)
-                    
-                    # Store file content and metadata
-                    file_group = files_group.create_group(safe_name)
-                    file_group.create_dataset("path", data=rel_path, dtype=h5py.string_dtype())
-                    file_group.create_dataset("extension", data=ext, dtype=h5py.string_dtype())
-                    file_group.create_dataset("size", data=file_size)
-                    
-                    # Handle different file types
-                    if ext in text_extensions:
-                        # Try to read as text file
-                        try:
-                            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                                content = f.read()
+                # Only store code files and common text files
+                if ext in code_extensions or file.lower() in ['readme', 'license', 'changelog', 'makefile', 'dockerfile']:
+                    try:
+                        # Read file content
+                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                            content = f.read()
+                        
+                        # Create a safe name for HDF5 dataset (replace special characters)
+                        safe_name = rel_path.replace('/', '_').replace('\\', '_').replace('.', '_dot_')
+                        
+                        # Store file content and metadata
+                        file_group = files_group.create_group(safe_name)
+                        file_group.create_dataset("content", data=content, dtype=h5py.string_dtype())
+                        file_group.create_dataset("path", data=rel_path, dtype=h5py.string_dtype())
+                        file_group.create_dataset("extension", data=ext, dtype=h5py.string_dtype())
+                        file_group.create_dataset("size", data=len(content))
+                        
+                        files_stored += 1
+                        
+                        
                             
-                            # Check for NULL bytes that would cause HDF5 issues
-                            if '\x00' in content:
-                                # Replace NULL bytes with a placeholder
-                                content = content.replace('\x00', '<NULL>')
-                                logging.warning(f"Replaced NULL bytes in text file: {rel_path}")
-                            
-                            file_group.create_dataset("content", data=content, dtype=h5py.string_dtype())
-                            file_group.create_dataset("content_type", data="text", dtype=h5py.string_dtype())
-                            
-                        except (UnicodeDecodeError, IOError, OSError) as e:
-                            # If text reading fails, treat as binary
-                            file_group.create_dataset("content", data="<binary file - could not decode as text>", dtype=h5py.string_dtype())
-                            file_group.create_dataset("content_type", data="binary", dtype=h5py.string_dtype())
-                            logging.warning(f"Could not read as text file {rel_path}: {e}")
-                    
-                    elif ext in binary_extensions:
-                        # Handle known binary files
-                        file_group.create_dataset("content", data=f"<binary file: {ext} format>", dtype=h5py.string_dtype())
-                        file_group.create_dataset("content_type", data="binary", dtype=h5py.string_dtype())
-                    
-                    else:
-                        # Unknown extension - try to read as text first
-                        try:
-                            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                                content = f.read()
-                            
-                            # Check for NULL bytes
-                            if '\x00' in content:
-                                file_group.create_dataset("content", data=f"<binary file: unknown format {ext}>", dtype=h5py.string_dtype())
-                                file_group.create_dataset("content_type", data="binary", dtype=h5py.string_dtype())
-                            else:
-                                file_group.create_dataset("content", data=content, dtype=h5py.string_dtype())
-                                file_group.create_dataset("content_type", data="text", dtype=h5py.string_dtype())
-                                
-                        except (UnicodeDecodeError, IOError, OSError):
-                            file_group.create_dataset("content", data=f"<binary file: unknown format {ext}>", dtype=h5py.string_dtype())
-                            file_group.create_dataset("content_type", data="binary", dtype=h5py.string_dtype())
-                    
-                    files_stored += 1
-                    logging.debug(f"Stored file: {rel_path} ({ext}, {file_size} bytes)")
-                            
-                except (IOError, OSError) as e:
-                    logging.warning(f"Could not process file {file_path}: {e}")
-                    continue
-                except Exception as e:
-                    logging.error(f"Unexpected error processing file {file_path}: {e}")
-                    continue
+                    except (UnicodeDecodeError, IOError, OSError) as e:
+                        logging.warning(f"Could not read file {file_path}: {e}")
+                        continue
+            
+            
     
     except Exception as e:
         logging.error(f"Error storing codebase from {repo_path}: {e}")
@@ -322,27 +240,6 @@ def read_repo_hdf5(hdf5_path):
                     for key in commits_group['statistics'].keys():
                         stats[key] = commits_group['statistics'][key][()]
                     data['commit_statistics'] = stats
-            
-            # Read keywords analysis
-            if 'keywords' in h5file:
-                keywords_group = h5file['keywords']
-                if 'keywords_analysis' in keywords_group:
-                    keywords_json = keywords_group['keywords_analysis'][()].decode('utf-8')
-                    data['keywords'] = json.loads(keywords_json)
-                
-                # Read key metrics
-                keyword_metrics = {}
-                for key in ["total_files_processed", "total_keywords_extracted", "unique_keywords", 
-                           "filtered_keywords_count", "malicious_score"]:
-                    if key in keywords_group:
-                        keyword_metrics[key] = keywords_group[key][()]
-                if keyword_metrics:
-                    data['keyword_metrics'] = keyword_metrics
-                
-                # Read malicious keywords
-                if 'malicious_keywords' in keywords_group:
-                    malicious_json = keywords_group['malicious_keywords'][()].decode('utf-8')
-                    data['malicious_keywords'] = json.loads(malicious_json)
             
             # Read file information (not content, just metadata)
             if 'codebase' in h5file and 'files' in h5file['codebase']:

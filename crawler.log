@@ -26,3 +26,217 @@
 2025-08-26 18:10:48,498 INFO: Extracted 23 total keywords (10 unique) from 1 files
 2025-08-26 18:10:48,498 INFO: Filtered to 5 significant keywords
 2025-08-26 18:10:48,498 INFO: Identified 5 potentially malicious keywords
+2025-09-26 18:34:42,822 INFO: Starting comprehensive security analysis of: /var/folders/35/2pz7vhmd2tbdwb73n7k07j7c0000gn/T/security_test_q31qkebm
+2025-09-26 18:34:42,827 INFO: Running keyword-based malicious pattern detection...
+2025-09-26 18:34:42,827 INFO: Extracting keywords from repository: /var/folders/35/2pz7vhmd2tbdwb73n7k07j7c0000gn/T/security_test_q31qkebm
+2025-09-26 18:34:42,849 INFO: Extracted 966 total keywords (278 unique) from 5 files
+2025-09-26 18:34:42,849 INFO: Filtered to 233 significant keywords
+2025-09-26 18:34:42,849 INFO: Identified 61 potentially malicious keywords
+2025-09-26 18:34:42,849 INFO: Running YARA rule pattern matching...
+2025-09-26 18:34:42,855 INFO: Successfully compiled 4 YARA rule files
+2025-09-26 18:34:42,855 INFO: Starting YARA scan of repository: /var/folders/35/2pz7vhmd2tbdwb73n7k07j7c0000gn/T/security_test_q31qkebm
+2025-09-26 18:34:42,856 INFO: YARA scan completed: 16 matches in 5 files
+2025-09-26 18:34:42,856 INFO: Running vulnerability analysis...
+2025-09-26 18:34:42,856 INFO: Starting vulnerability scan of repository: /var/folders/35/2pz7vhmd2tbdwb73n7k07j7c0000gn/T/security_test_q31qkebm
+2025-09-26 18:34:42,868 INFO: Vulnerability scan completed: 11 findings in 5 files
+2025-09-26 18:34:42,868 INFO: Comprehensive security analysis completed
+2025-09-26 18:52:53,245 INFO: Attempting to clone microsoft/vscode to fivekdataset/microsoft_vscode
+2025-09-26 18:55:20,219 INFO: Attempting to clone justakazh/checker_shell to fivekdataset/justakazh_checker_shell
+2025-09-26 18:56:31,732 INFO: Attempting to clone nikolovivan/telnet-server to fivekdataset/nikolovivan_telnet-server
+2025-09-26 18:56:32,449 INFO: Successfully cloned nikolovivan/telnet-server to fivekdataset/nikolovivan_telnet-server
+2025-09-26 18:56:32,449 INFO: Extracting comprehensive security analysis from fivekdataset/nikolovivan_telnet-server
+2025-09-26 18:56:32,458 INFO: Starting comprehensive security analysis of: fivekdataset/nikolovivan_telnet-server
+2025-09-26 18:56:32,458 INFO: Running keyword-based malicious pattern detection...
+2025-09-26 18:56:32,458 INFO: Extracting keywords from repository: fivekdataset/nikolovivan_telnet-server
+2025-09-26 18:56:32,461 INFO: Extracted 0 total keywords (0 unique) from 0 files
+2025-09-26 18:56:32,461 INFO: Filtered to 0 significant keywords
+2025-09-26 18:56:32,461 INFO: Identified 0 potentially malicious keywords
+2025-09-26 18:56:32,461 INFO: Running YARA rule pattern matching...
+2025-09-26 18:56:32,467 INFO: Successfully compiled 4 YARA rule files
+2025-09-26 18:56:32,467 INFO: Starting YARA scan of repository: fivekdataset/nikolovivan_telnet-server
+2025-09-26 18:56:32,468 INFO: YARA scan completed: 0 matches in 0 files
+2025-09-26 18:56:32,468 INFO: Running vulnerability analysis...
+2025-09-26 18:56:32,468 INFO: Starting vulnerability scan of repository: fivekdataset/nikolovivan_telnet-server
+2025-09-26 18:56:32,469 INFO: Vulnerability scan completed: 0 findings in 0 files
+2025-09-26 18:56:32,469 INFO: Comprehensive security analysis completed
+2025-09-26 18:56:32,470 INFO: Comprehensive security analysis completed for fivekdataset/nikolovivan_telnet-server:
+2025-09-26 18:56:32,470 INFO:   - Combined risk score: 0.0
+2025-09-26 18:56:32,470 INFO:   - Risk level: MINIMAL
+2025-09-26 18:56:32,470 INFO:   - Confidence: 0.5
+2025-09-26 18:56:32,470 INFO:   - Threat indicators: 0
+2025-10-08 10:04:20,177 INFO: Attempting to clone lm10pulkit/backdoor to fivekdataset/lm10pulkit_backdoor
+2025-10-08 10:04:21,097 INFO: Successfully cloned lm10pulkit/backdoor to fivekdataset/lm10pulkit_backdoor
+2025-10-08 10:04:21,097 INFO: Extracting comprehensive security analysis from fivekdataset/lm10pulkit_backdoor
+2025-10-08 10:04:21,171 INFO: Starting comprehensive security analysis of: fivekdataset/lm10pulkit_backdoor
+2025-10-08 10:04:21,171 INFO: Running keyword-based malicious pattern detection...
+2025-10-08 10:04:21,171 INFO: Extracting keywords from repository: fivekdataset/lm10pulkit_backdoor
+2025-10-08 10:04:21,190 INFO: Extracted 1613 total keywords (190 unique) from 7 files
+2025-10-08 10:04:21,190 INFO: Filtered to 164 significant keywords
+2025-10-08 10:04:21,190 INFO: Identified 25 potentially malicious keywords
+2025-10-08 10:04:21,190 INFO: Running YARA rule pattern matching...
+2025-10-08 10:04:21,199 INFO: Successfully compiled 4 YARA rule files
+2025-10-08 10:04:21,199 INFO: Starting YARA scan of repository: fivekdataset/lm10pulkit_backdoor
+2025-10-08 10:04:21,200 INFO: YARA scan completed: 2 matches in 7 files
+2025-10-08 10:04:21,200 INFO: Running vulnerability analysis...
+2025-10-08 10:04:21,200 INFO: Starting vulnerability scan of repository: fivekdataset/lm10pulkit_backdoor
+2025-10-08 10:04:21,213 INFO: Vulnerability scan completed: 3 findings in 7 files
+2025-10-08 10:04:21,213 INFO: Comprehensive security analysis completed
+2025-10-08 10:04:21,213 INFO: Comprehensive security analysis completed for fivekdataset/lm10pulkit_backdoor:
+2025-10-08 10:04:21,213 INFO:   - Combined risk score: 0.247
+2025-10-08 10:04:21,213 INFO:   - Risk level: MEDIUM
+2025-10-08 10:04:21,213 INFO:   - Confidence: 1.0
+2025-10-08 10:04:21,213 INFO:   - Threat indicators: 1
+2025-10-08 10:04:58,041 INFO: Attempting to clone geeksonsecurity/android-overlay-malware-example to fivekdataset/geeksonsecurity_android-overlay-malware-example
+2025-10-08 10:04:59,330 INFO: Successfully cloned geeksonsecurity/android-overlay-malware-example to fivekdataset/geeksonsecurity_android-overlay-malware-example
+2025-10-08 10:04:59,330 INFO: Extracting comprehensive security analysis from fivekdataset/geeksonsecurity_android-overlay-malware-example
+2025-10-08 10:04:59,341 INFO: Starting comprehensive security analysis of: fivekdataset/geeksonsecurity_android-overlay-malware-example
+2025-10-08 10:04:59,341 INFO: Running keyword-based malicious pattern detection...
+2025-10-08 10:04:59,341 INFO: Extracting keywords from repository: fivekdataset/geeksonsecurity_android-overlay-malware-example
+2025-10-08 10:04:59,386 INFO: Extracted 4393 total keywords (565 unique) from 21 files
+2025-10-08 10:04:59,386 INFO: Filtered to 222 significant keywords
+2025-10-08 10:04:59,386 INFO: Identified 16 potentially malicious keywords
+2025-10-08 10:04:59,386 INFO: Running YARA rule pattern matching...
+2025-10-08 10:04:59,394 INFO: Successfully compiled 4 YARA rule files
+2025-10-08 10:04:59,395 INFO: Starting YARA scan of repository: fivekdataset/geeksonsecurity_android-overlay-malware-example
+2025-10-08 10:04:59,400 INFO: YARA scan completed: 5 matches in 22 files
+2025-10-08 10:04:59,401 INFO: Running vulnerability analysis...
+2025-10-08 10:04:59,401 INFO: Starting vulnerability scan of repository: fivekdataset/geeksonsecurity_android-overlay-malware-example
+2025-10-08 10:04:59,457 INFO: Vulnerability scan completed: 2 findings in 20 files
+2025-10-08 10:04:59,457 INFO: Comprehensive security analysis completed
+2025-10-08 10:04:59,457 INFO: Comprehensive security analysis completed for fivekdataset/geeksonsecurity_android-overlay-malware-example:
+2025-10-08 10:04:59,458 INFO:   - Combined risk score: 0.219
+2025-10-08 10:04:59,458 INFO:   - Risk level: HIGH
+2025-10-08 10:04:59,458 INFO:   - Confidence: 1.0
+2025-10-08 10:04:59,458 INFO:   - Threat indicators: 3
+2025-10-08 10:06:18,022 INFO: Attempting to clone DatePlannerStormHacks/DatePlanner to fivekdataset/DatePlannerStormHacks_DatePlanner
+2025-10-08 10:06:19,264 INFO: Successfully cloned DatePlannerStormHacks/DatePlanner to fivekdataset/DatePlannerStormHacks_DatePlanner
+2025-10-08 10:06:19,265 INFO: Extracting comprehensive security analysis from fivekdataset/DatePlannerStormHacks_DatePlanner
+2025-10-08 10:06:19,274 INFO: Starting comprehensive security analysis of: fivekdataset/DatePlannerStormHacks_DatePlanner
+2025-10-08 10:06:19,274 INFO: Running keyword-based malicious pattern detection...
+2025-10-08 10:06:19,274 INFO: Extracting keywords from repository: fivekdataset/DatePlannerStormHacks_DatePlanner
+2025-10-08 10:06:19,323 INFO: Extracted 5208 total keywords (773 unique) from 23 files
+2025-10-08 10:06:19,323 INFO: Filtered to 221 significant keywords
+2025-10-08 10:06:19,323 INFO: Identified 6 potentially malicious keywords
+2025-10-08 10:06:19,323 INFO: Running YARA rule pattern matching...
+2025-10-08 10:06:19,332 INFO: Successfully compiled 4 YARA rule files
+2025-10-08 10:06:19,332 INFO: Starting YARA scan of repository: fivekdataset/DatePlannerStormHacks_DatePlanner
+2025-10-08 10:06:19,348 INFO: YARA scan completed: 3 matches in 23 files
+2025-10-08 10:06:19,348 INFO: Running vulnerability analysis...
+2025-10-08 10:06:19,348 INFO: Starting vulnerability scan of repository: fivekdataset/DatePlannerStormHacks_DatePlanner
+2025-10-08 10:06:19,667 INFO: Vulnerability scan completed: 0 findings in 18 files
+2025-10-08 10:06:19,667 INFO: Comprehensive security analysis completed
+2025-10-08 10:06:19,668 INFO: Comprehensive security analysis completed for fivekdataset/DatePlannerStormHacks_DatePlanner:
+2025-10-08 10:06:19,668 INFO:   - Combined risk score: 0.098
+2025-10-08 10:06:19,668 INFO:   - Risk level: CRITICAL
+2025-10-08 10:06:19,668 INFO:   - Confidence: 1.0
+2025-10-08 10:06:19,668 INFO:   - Threat indicators: 3
+2025-10-08 10:07:10,808 INFO: Attempting to clone CMDF-FoodPrint/foodprint to fivekdataset/CMDF-FoodPrint_foodprint
+2025-10-08 10:07:11,996 INFO: Successfully cloned CMDF-FoodPrint/foodprint to fivekdataset/CMDF-FoodPrint_foodprint
+2025-10-08 10:07:11,996 INFO: Extracting comprehensive security analysis from fivekdataset/CMDF-FoodPrint_foodprint
+2025-10-08 10:07:12,004 INFO: Starting comprehensive security analysis of: fivekdataset/CMDF-FoodPrint_foodprint
+2025-10-08 10:07:12,007 INFO: Running keyword-based malicious pattern detection...
+2025-10-08 10:07:12,007 INFO: Extracting keywords from repository: fivekdataset/CMDF-FoodPrint_foodprint
+2025-10-08 10:07:12,044 INFO: Extracted 3254 total keywords (407 unique) from 27 files
+2025-10-08 10:07:12,044 INFO: Filtered to 198 significant keywords
+2025-10-08 10:07:12,044 INFO: Identified 1 potentially malicious keywords
+2025-10-08 10:07:12,044 INFO: Running YARA rule pattern matching...
+2025-10-08 10:07:12,050 INFO: Successfully compiled 4 YARA rule files
+2025-10-08 10:07:12,050 INFO: Starting YARA scan of repository: fivekdataset/CMDF-FoodPrint_foodprint
+2025-10-08 10:07:12,063 INFO: YARA scan completed: 2 matches in 27 files
+2025-10-08 10:07:12,064 INFO: Running vulnerability analysis...
+2025-10-08 10:07:12,064 INFO: Starting vulnerability scan of repository: fivekdataset/CMDF-FoodPrint_foodprint
+2025-10-08 10:07:12,248 INFO: Vulnerability scan completed: 0 findings in 21 files
+2025-10-08 10:07:12,248 INFO: Comprehensive security analysis completed
+2025-10-08 10:07:12,249 INFO: Comprehensive security analysis completed for fivekdataset/CMDF-FoodPrint_foodprint:
+2025-10-08 10:07:12,249 INFO:   - Combined risk score: 0.026
+2025-10-08 10:07:12,249 INFO:   - Risk level: HIGH
+2025-10-08 10:07:12,249 INFO:   - Confidence: 1.0
+2025-10-08 10:07:12,249 INFO:   - Threat indicators: 1
+2025-10-08 10:16:00,050 INFO: Attempting to clone CMDF-FoodPrint/foodprint to fivekdataset/CMDF-FoodPrint_foodprint
+2025-10-08 10:16:01,352 INFO: Successfully cloned CMDF-FoodPrint/foodprint to fivekdataset/CMDF-FoodPrint_foodprint
+2025-10-08 10:16:01,352 INFO: Extracting comprehensive security analysis from fivekdataset/CMDF-FoodPrint_foodprint
+2025-10-08 10:16:01,371 INFO: Starting comprehensive security analysis of: fivekdataset/CMDF-FoodPrint_foodprint
+2025-10-08 10:16:01,371 INFO: Running keyword-based malicious pattern detection...
+2025-10-08 10:16:01,371 INFO: Extracting keywords from repository: fivekdataset/CMDF-FoodPrint_foodprint
+2025-10-08 10:16:01,411 INFO: Extracted 3254 total keywords (407 unique) from 27 files
+2025-10-08 10:16:01,411 INFO: Filtered to 198 significant keywords
+2025-10-08 10:16:01,411 INFO: Identified 1 potentially malicious keywords
+2025-10-08 10:16:01,412 INFO: Running YARA rule pattern matching...
+2025-10-08 10:16:01,426 INFO: Successfully compiled 4 YARA rule files
+2025-10-08 10:16:01,426 INFO: Starting YARA scan of repository: fivekdataset/CMDF-FoodPrint_foodprint
+2025-10-08 10:16:01,442 INFO: YARA scan completed: 2 matches in 27 files
+2025-10-08 10:16:01,442 INFO: Running vulnerability analysis...
+2025-10-08 10:16:01,442 INFO: Starting vulnerability scan of repository: fivekdataset/CMDF-FoodPrint_foodprint
+2025-10-08 10:16:01,695 INFO: Vulnerability scan completed: 0 findings in 21 files
+2025-10-08 10:16:01,695 INFO: Comprehensive security analysis completed
+2025-10-08 10:16:01,696 INFO: Comprehensive security analysis completed for fivekdataset/CMDF-FoodPrint_foodprint:
+2025-10-08 10:16:01,696 INFO:   - Combined risk score: 0.026
+2025-10-08 10:16:01,696 INFO:   - Risk level: MINIMAL
+2025-10-08 10:16:01,696 INFO:   - Confidence: 1.0
+2025-10-08 10:16:01,696 INFO:   - Threat indicators: 0
+2025-10-08 10:16:14,187 INFO: Attempting to clone DatePlannerStormHacks/DatePlanner to fivekdataset/DatePlannerStormHacks_DatePlanner
+2025-10-08 10:16:15,697 INFO: Successfully cloned DatePlannerStormHacks/DatePlanner to fivekdataset/DatePlannerStormHacks_DatePlanner
+2025-10-08 10:16:15,697 INFO: Extracting comprehensive security analysis from fivekdataset/DatePlannerStormHacks_DatePlanner
+2025-10-08 10:16:15,704 INFO: Starting comprehensive security analysis of: fivekdataset/DatePlannerStormHacks_DatePlanner
+2025-10-08 10:16:15,704 INFO: Running keyword-based malicious pattern detection...
+2025-10-08 10:16:15,704 INFO: Extracting keywords from repository: fivekdataset/DatePlannerStormHacks_DatePlanner
+2025-10-08 10:16:15,751 INFO: Extracted 5208 total keywords (773 unique) from 23 files
+2025-10-08 10:16:15,751 INFO: Filtered to 221 significant keywords
+2025-10-08 10:16:15,751 INFO: Identified 2 potentially malicious keywords
+2025-10-08 10:16:15,751 INFO: Running YARA rule pattern matching...
+2025-10-08 10:16:15,757 INFO: Successfully compiled 4 YARA rule files
+2025-10-08 10:16:15,757 INFO: Starting YARA scan of repository: fivekdataset/DatePlannerStormHacks_DatePlanner
+2025-10-08 10:16:15,772 INFO: YARA scan completed: 3 matches in 23 files
+2025-10-08 10:16:15,772 INFO: Running vulnerability analysis...
+2025-10-08 10:16:15,772 INFO: Starting vulnerability scan of repository: fivekdataset/DatePlannerStormHacks_DatePlanner
+2025-10-08 10:16:16,026 INFO: Vulnerability scan completed: 0 findings in 18 files
+2025-10-08 10:16:16,026 INFO: Comprehensive security analysis completed
+2025-10-08 10:16:16,026 INFO: Comprehensive security analysis completed for fivekdataset/DatePlannerStormHacks_DatePlanner:
+2025-10-08 10:16:16,026 INFO:   - Combined risk score: 0.06
+2025-10-08 10:16:16,026 INFO:   - Risk level: MINIMAL
+2025-10-08 10:16:16,026 INFO:   - Confidence: 1.0
+2025-10-08 10:16:16,026 INFO:   - Threat indicators: 0
+2025-10-08 10:17:19,926 INFO: Attempting to clone geeksonsecurity/android-overlay-malware-example to fivekdataset/geeksonsecurity_android-overlay-malware-example
+2025-10-08 10:17:21,375 INFO: Successfully cloned geeksonsecurity/android-overlay-malware-example to fivekdataset/geeksonsecurity_android-overlay-malware-example
+2025-10-08 10:17:21,376 INFO: Extracting comprehensive security analysis from fivekdataset/geeksonsecurity_android-overlay-malware-example
+2025-10-08 10:17:21,399 INFO: Starting comprehensive security analysis of: fivekdataset/geeksonsecurity_android-overlay-malware-example
+2025-10-08 10:17:21,400 INFO: Running keyword-based malicious pattern detection...
+2025-10-08 10:17:21,400 INFO: Extracting keywords from repository: fivekdataset/geeksonsecurity_android-overlay-malware-example
+2025-10-08 10:17:21,452 INFO: Extracted 4286 total keywords (558 unique) from 21 files
+2025-10-08 10:17:21,452 INFO: Filtered to 216 significant keywords
+2025-10-08 10:17:21,452 INFO: Identified 2 potentially malicious keywords
+2025-10-08 10:17:21,453 INFO: Running YARA rule pattern matching...
+2025-10-08 10:17:21,486 INFO: Successfully compiled 4 YARA rule files
+2025-10-08 10:17:21,488 INFO: Starting YARA scan of repository: fivekdataset/geeksonsecurity_android-overlay-malware-example
+2025-10-08 10:17:21,510 INFO: YARA scan completed: 5 matches in 22 files
+2025-10-08 10:17:21,510 INFO: Running vulnerability analysis...
+2025-10-08 10:17:21,515 INFO: Starting vulnerability scan of repository: fivekdataset/geeksonsecurity_android-overlay-malware-example
+2025-10-08 10:17:21,583 INFO: Vulnerability scan completed: 2 findings in 20 files
+2025-10-08 10:17:21,583 INFO: Comprehensive security analysis completed
+2025-10-08 10:17:21,584 INFO: Comprehensive security analysis completed for fivekdataset/geeksonsecurity_android-overlay-malware-example:
+2025-10-08 10:17:21,584 INFO:   - Combined risk score: 0.142
+2025-10-08 10:17:21,584 INFO:   - Risk level: MINIMAL
+2025-10-08 10:17:21,584 INFO:   - Confidence: 1.0
+2025-10-08 10:17:21,584 INFO:   - Threat indicators: 0
+2025-10-08 10:17:34,706 INFO: Attempting to clone CMDF-FoodPrint/foodprint to fivekdataset/CMDF-FoodPrint_foodprint
+2025-10-08 10:17:35,686 INFO: Successfully cloned CMDF-FoodPrint/foodprint to fivekdataset/CMDF-FoodPrint_foodprint
+2025-10-08 10:17:35,686 INFO: Extracting comprehensive security analysis from fivekdataset/CMDF-FoodPrint_foodprint
+2025-10-08 10:17:35,696 INFO: Starting comprehensive security analysis of: fivekdataset/CMDF-FoodPrint_foodprint
+2025-10-08 10:17:35,696 INFO: Running keyword-based malicious pattern detection...
+2025-10-08 10:17:35,696 INFO: Extracting keywords from repository: fivekdataset/CMDF-FoodPrint_foodprint
+2025-10-08 10:17:35,731 INFO: Extracted 3248 total keywords (405 unique) from 27 files
+2025-10-08 10:17:35,731 INFO: Filtered to 197 significant keywords
+2025-10-08 10:17:35,731 INFO: Identified 0 potentially malicious keywords
+2025-10-08 10:17:35,731 INFO: Running YARA rule pattern matching...
+2025-10-08 10:17:35,737 INFO: Successfully compiled 4 YARA rule files
+2025-10-08 10:17:35,737 INFO: Starting YARA scan of repository: fivekdataset/CMDF-FoodPrint_foodprint
+2025-10-08 10:17:35,749 INFO: YARA scan completed: 2 matches in 27 files
+2025-10-08 10:17:35,749 INFO: Running vulnerability analysis...
+2025-10-08 10:17:35,749 INFO: Starting vulnerability scan of repository: fivekdataset/CMDF-FoodPrint_foodprint
+2025-10-08 10:17:35,934 INFO: Vulnerability scan completed: 0 findings in 21 files
+2025-10-08 10:17:35,934 INFO: Comprehensive security analysis completed
+2025-10-08 10:17:35,934 INFO: Comprehensive security analysis completed for fivekdataset/CMDF-FoodPrint_foodprint:
+2025-10-08 10:17:35,934 INFO:   - Combined risk score: 0.017
+2025-10-08 10:17:35,934 INFO:   - Risk level: MINIMAL
+2025-10-08 10:17:35,934 INFO:   - Confidence: 0.85
+2025-10-08 10:17:35,934 INFO:   - Threat indicators: 0

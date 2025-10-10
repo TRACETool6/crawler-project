@@ -59,27 +59,23 @@ class MaliciousKeywordExtractor:
             'towards', 'across', 'behind', 'beyond', 'beside', 'beneath', 'throughout'
         ])
         
-        # Seed keywords based on research papers for malicious repository detection
+        # More specific malicious keywords (removed overly broad terms)
         self.malicious_seed_keywords = {
-            # Malware-related from GitHub-Malware dataset examples
-            'spy', 'mine', 'bitcoin', 'miner', 'trojan', 'virus', 'malware', 'backdoor',
-            'keylogger', 'rootkit', 'exploit', 'payload', 'shell', 'reverse', 'bind',
-            'cryptojacking', 'cryptocurrency', 'stealer', 'ransomware', 'phishing',
-            'botnet', 'ddos', 'dos', 'attack', 'hack', 'crack', 'bypass', 'injection',
-            'vulnerability', 'zero_day', 'rat', 'remote_access', 'persistence',
-            'privilege_escalation', 'lateral_movement', 'exfiltration', 'c2', 'command_control',
-            # Network and system exploitation
-            'socket', 'connect', 'listen', 'bind', 'send', 'recv', 'execute', 'system',
-            'eval', 'exec', 'popen', 'subprocess', 'shell_exec', 'passthru',
-            # Crypto and evasion
-            'encrypt', 'decrypt', 'obfuscate', 'encode', 'decode', 'base64', 'hex',
-            'xor', 'cipher', 'hash', 'steganography', 'hide', 'conceal',
-            # File and registry manipulation
-            'download', 'upload', 'delete', 'modify', 'registry', 'startup', 'autorun',
-            'persistence', 'schedule', 'task', 'service', 'driver',
-            # Suspicious behaviors
-            'screenshot', 'keylog', 'clipboard', 'webcam', 'microphone', 'steal',
-            'dump', 'extract', 'scrape', 'harvest', 'collect'
+            # Clear malware-related terms
+            'spy', 'trojan', 'virus', 'malware', 'backdoor', 'keylogger', 'rootkit', 
+            'exploit', 'payload', 'cryptojacking', 'stealer', 'ransomware', 'phishing',
+            'botnet', 'ddos', 'attack', 'hack', 'crack', 'bypass', 'injection',
+            'zero_day', 'rat', 'remote_access', 'privilege_escalation', 'lateral_movement', 
+            'exfiltration', 'c2', 'command_control',
+            # Evasion and obfuscation (be more specific)
+            'obfuscate', 'steganography', 'hide_process', 'conceal_file',
+            # Specific suspicious system interactions
+            'shell_exec', 'passthru', 'eval_code', 'exec_command',
+            # Registry and persistence (more specific)
+            'registry_modify', 'startup_persist', 'autorun_malicious',
+            # Clearly suspicious behaviors
+            'keylog', 'screenshot_steal', 'webcam_spy', 'microphone_spy', 'steal_data',
+            'dump_memory', 'scrape_credentials', 'harvest_tokens'
         }
         
         # Common legitimate programming terms to reduce false positives
@@ -90,7 +86,10 @@ class MaliciousKeywordExtractor:
             'method', 'function', 'variable', 'parameter', 'argument', 'return',
             'value', 'result', 'output', 'input', 'data', 'information', 'content',
             'text', 'string', 'number', 'integer', 'float', 'boolean', 'array',
-            'list', 'dictionary', 'object', 'json', 'xml', 'html', 'css', 'javascript'
+            'list', 'dictionary', 'object', 'json', 'xml', 'html', 'css', 'javascript',
+            # Common system terms that are legitimate
+            'start', 'process', 'system', 'service', 'task', 'collection', 'delete',
+            'socket', 'connect', 'listen', 'send', 'receive', 'execute', 'command'
         }
 
     def extract_keywords_from_code(self, code_content, file_extension):
@@ -327,6 +326,10 @@ class MaliciousKeywordExtractor:
         malicious_keywords = {}
         
         for keyword, freq in keyword_freq.items():
+            # Skip if it's a legitimate term
+            if keyword in self.legitimate_terms:
+                continue
+                
             # Direct match with seed keywords
             if keyword in self.malicious_seed_keywords:
                 malicious_keywords[keyword] = freq
@@ -337,24 +340,35 @@ class MaliciousKeywordExtractor:
                 malicious_keywords[keyword] = freq
                 continue
             
-            # Substring matching with seed keywords
+            # Substring matching with seed keywords (more conservative)
             for seed in self.malicious_seed_keywords:
-                if (len(seed) > 4 and seed in keyword) or (len(keyword) > 4 and keyword in seed):
+                if (len(seed) > 6 and seed in keyword) or (len(keyword) > 6 and keyword in seed):
                     malicious_keywords[keyword] = freq
                     break
         
         return malicious_keywords
 
     def _is_malicious_pattern(self, keyword):
-        """Check if keyword matches malicious patterns."""
+        """Check if keyword matches malicious patterns - more conservative."""
+        # More specific patterns to reduce false positives
         malicious_patterns = [
             r'.*hack.*', r'.*crack.*', r'.*exploit.*', r'.*payload.*', r'.*backdoor.*',
             r'.*trojan.*', r'.*virus.*', r'.*malware.*', r'.*keylog.*', r'.*stealer.*',
-            r'.*miner.*', r'.*crypto.*', r'.*ransomware.*', r'.*botnet.*', r'.*ddos.*',
-            r'.*injection.*', r'.*bypass.*', r'.*escalat.*', r'.*persistence.*',
-            r'.*exfiltrat.*', r'.*c2.*', r'.*command.*control.*', r'.*remote.*access.*',
-            r'.*reverse.*shell.*', r'.*bind.*shell.*', r'.*obfuscat.*', r'.*encrypt.*'
+            r'.*ransomware.*', r'.*botnet.*', r'.*ddos.*', r'.*injection.*', 
+            r'.*bypass.*', r'.*escalat.*', r'.*exfiltrat.*', r'.*c2.*',
+            r'.*reverse.*shell.*', r'.*bind.*shell.*', r'.*obfuscat.*'
         ]
+        
+        # Additional context-based filtering to reduce false positives
+        legitimate_contexts = [
+            r'.*test.*', r'.*demo.*', r'.*example.*', r'.*tutorial.*', r'.*doc.*',
+            r'.*config.*', r'.*setup.*', r'.*install.*'
+        ]
+        
+        # Don't flag if it appears to be in a legitimate context
+        for legit_pattern in legitimate_contexts:
+            if re.match(legit_pattern, keyword, re.IGNORECASE):
+                return False
         
         for pattern in malicious_patterns:
             if re.match(pattern, keyword, re.IGNORECASE):

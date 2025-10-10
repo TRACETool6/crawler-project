@@ -87,14 +87,13 @@ rule Backdoor_Patterns
         severity = "high"
     
     strings:
-        $reverse_shell_1 = /socket\\.connect\\s*\\(\\s*\\([^)]+\\)\\s*\\)/
-        $reverse_shell_2 = /subprocess\.(run|Popen|call)\s*\([^)]*shell\s*=\s*True/
-        $command_exec = /exec\s*\(\s*[^)]*recv\s*\(/
-        $backdoor_listen = /socket\.bind\s*\(\s*\([^)]+\)\s*\)/
+        // More specific patterns to reduce false positives
+        $reverse_shell_1 = /socket\\.connect\\s*\\(\\s*\\([^)]+\\)\\s*\\).*exec\s*\(/
+        $command_exec = /exec\s*\(\s*[^)]*recv\s*\([^)]*\)\s*\)/
         $c2_communication = /(command.{0,20}control|c2.{0,10}server)/i
-        $persistence_registry = /reg\s+add.*CurrentVersion.*Run/i
-        $persistence_startup = /(startup|autorun|schedule)/i
-        $remote_access = /remote.{0,10}access/i
+        $persistence_registry = /reg\s+add.*CurrentVersion.*Run.*backdoor/i
+        $remote_access_tool = /remote.{0,10}access.{0,20}(tool|trojan|backdoor)/i
+        $shell_backdoor = /(reverse|bind).{0,20}shell.{0,20}(backdoor|trojan)/i
         
     condition:
         any of them
@@ -121,7 +120,7 @@ rule Keylogger_Patterns
 }
 """
         
-        # Cryptocurrency miner rules
+        # Cryptocurrency miner rules - more specific
         crypto_rules = """
 rule Cryptocurrency_Miner
 {
@@ -131,15 +130,14 @@ rule Cryptocurrency_Miner
         severity = "medium"
     
     strings:
-        $mining_1 = /(bitcoin|ethereum|monero|litecoin).{0,20}(mine|mining|miner)/i
-        $mining_2 = /mining.{0,20}pool/i
-        $mining_3 = /stratum\\+tcp/i
-        $mining_4 = /hashrate/i
-        $mining_5 = /cryptonight/i
-        $mining_6 = /sha256.*nonce/i
-        $wallet_1 = /[13][a-km-zA-HJ-NP-Z1-9]{25,34}/ // Bitcoin address
-        $wallet_2 = /0x[a-fA-F0-9]{40}/ // Ethereum address
+        // More specific mining patterns
+        $mining_1 = /stratum\\+tcp/i
+        $mining_2 = /cryptonight/i
         $cryptojacking = /cryptojacking/i
+        $coinhive = /coinhive/i
+        $mining_malware = /(mining|miner).{0,20}(malware|trojan|backdoor)/i
+        // Only flag wallets in suspicious contexts
+        $suspicious_wallet = /(steal|hijack|mine).{0,50}[13][a-km-zA-HJ-NP-Z1-9]{25,34}/
         
     condition:
         any of them
