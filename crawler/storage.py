@@ -147,13 +147,21 @@ def _store_codebase(group, repo_path):
     if not repo_path or not os.path.exists(repo_path):
         return
     
-    # Define file extensions to include (common code file types)
-    code_extensions = {
+    # Define file extensions to include (common code and text file types)
+    text_extensions = {
         '.py', '.js', '.ts', '.java', '.cpp', '.c', '.h', '.hpp', '.cs', '.go',
         '.rs', '.php', '.rb', '.swift', '.kt', '.scala', '.clj', '.hs', '.ml',
         '.r', '.m', '.sh', '.bash', '.zsh', '.ps1', '.sql', '.html', '.css',
         '.xml', '.json', '.yaml', '.yml', '.toml', '.ini', '.cfg', '.conf',
-        '.md', '.txt', '.rst', '.tex', '.dockerfile', '.makefile', '.cmake'
+        '.md', '.txt', '.rst', '.tex', '.dockerfile', '.makefile', '.cmake',
+        '.rtf', '.log', '.gitignore', '.license', '.copying', ''  # Include files without extension
+    }
+    
+    # Binary file extensions to handle specially
+    binary_extensions = {
+        '.exe', '.bin', '.dll', '.so', '.dylib', '.jar', '.class', '.pyc',
+        '.zip', '.tar', '.gz', '.7z', '.rar', '.pdf', '.doc', '.docx',
+        '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.ico', '.svg'
     }
     
     files_stored = 0
@@ -169,35 +177,78 @@ def _store_codebase(group, repo_path):
                 file_path = os.path.join(root, file)
                 rel_path = os.path.relpath(file_path, repo_path)
                 
-                # Get file extension
+                # Get file extension (handle files without extensions)
                 _, ext = os.path.splitext(file.lower())
+                if not ext:
+                    ext = ''  # Files without extension
                 
-                # Only store code files and common text files
-                if ext:
-                    try:
-                        # Read file content
-                        with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
-                            content = f.read()
-                        
-                        # Create a safe name for HDF5 dataset (replace special characters)
-                        safe_name = rel_path.replace('/', '_').replace('\\', '_').replace('.', '_dot_')
-                        
-                        # Store file content and metadata
-                        file_group = files_group.create_group(safe_name)
-                        file_group.create_dataset("content", data=content, dtype=h5py.string_dtype())
-                        file_group.create_dataset("path", data=rel_path, dtype=h5py.string_dtype())
-                        file_group.create_dataset("extension", data=ext, dtype=h5py.string_dtype())
-                        file_group.create_dataset("size", data=len(content))
-                        
-                        files_stored += 1
-                        
-                        
+                # Create a safe name for HDF5 dataset (replace special characters)
+                safe_name = rel_path.replace('/', '_').replace('\\', '_').replace('.', '_dot_').replace(' ', '_')
+                
+                try:
+                    # Get file size
+                    file_size = os.path.getsize(file_path)
+                    
+                    # Store file content and metadata
+                    file_group = files_group.create_group(safe_name)
+                    file_group.create_dataset("path", data=rel_path, dtype=h5py.string_dtype())
+                    file_group.create_dataset("extension", data=ext, dtype=h5py.string_dtype())
+                    file_group.create_dataset("size", data=file_size)
+                    
+                    # Handle different file types
+                    if ext in text_extensions:
+                        # Try to read as text file
+                        try:
+                            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                                content = f.read()
                             
-                    except (UnicodeDecodeError, IOError, OSError) as e:
-                        logging.warning(f"Could not read file {file_path}: {e}")
-                        continue
-            
-            
+                            # Check for NULL bytes that would cause HDF5 issues
+                            if '\x00' in content:
+                                # Replace NULL bytes with a placeholder
+                                content = content.replace('\x00', '<NULL>')
+                                logging.warning(f"Replaced NULL bytes in text file: {rel_path}")
+                            
+                            file_group.create_dataset("content", data=content, dtype=h5py.string_dtype())
+                            file_group.create_dataset("content_type", data="text", dtype=h5py.string_dtype())
+                            
+                        except (UnicodeDecodeError, IOError, OSError) as e:
+                            # If text reading fails, treat as binary
+                            file_group.create_dataset("content", data="<binary file - could not decode as text>", dtype=h5py.string_dtype())
+                            file_group.create_dataset("content_type", data="binary", dtype=h5py.string_dtype())
+                            logging.warning(f"Could not read as text file {rel_path}: {e}")
+                    
+                    elif ext in binary_extensions:
+                        # Handle known binary files
+                        file_group.create_dataset("content", data=f"<binary file: {ext} format>", dtype=h5py.string_dtype())
+                        file_group.create_dataset("content_type", data="binary", dtype=h5py.string_dtype())
+                    
+                    else:
+                        # Unknown extension - try to read as text first
+                        try:
+                            with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+                                content = f.read()
+                            
+                            # Check for NULL bytes
+                            if '\x00' in content:
+                                file_group.create_dataset("content", data=f"<binary file: unknown format {ext}>", dtype=h5py.string_dtype())
+                                file_group.create_dataset("content_type", data="binary", dtype=h5py.string_dtype())
+                            else:
+                                file_group.create_dataset("content", data=content, dtype=h5py.string_dtype())
+                                file_group.create_dataset("content_type", data="text", dtype=h5py.string_dtype())
+                                
+                        except (UnicodeDecodeError, IOError, OSError):
+                            file_group.create_dataset("content", data=f"<binary file: unknown format {ext}>", dtype=h5py.string_dtype())
+                            file_group.create_dataset("content_type", data="binary", dtype=h5py.string_dtype())
+                    
+                    files_stored += 1
+                    logging.debug(f"Stored file: {rel_path} ({ext}, {file_size} bytes)")
+                            
+                except (IOError, OSError) as e:
+                    logging.warning(f"Could not process file {file_path}: {e}")
+                    continue
+                except Exception as e:
+                    logging.error(f"Unexpected error processing file {file_path}: {e}")
+                    continue
     
     except Exception as e:
         logging.error(f"Error storing codebase from {repo_path}: {e}")
