@@ -36,8 +36,47 @@ SUSPICIOUS_FILE_PATTERNS = [
 ]
 
 EXECUTABLE_EXTENSIONS = {
-    '.py', '.js', '.sh', '.bash', '.ps1', '.bat', '.cmd', '.vbs',
-    '.exe', '.dll', '.so', '.dylib', '.bin', '.elf'
+    # Python & JavaScript
+    '.py', '.js', '.jsx', '.ts', '.tsx',
+    
+    # Shell scripts
+    '.sh', '.bash', '.zsh', '.fish',
+    
+    # Windows scripts & executables
+    '.ps1', '.bat', '.cmd', '.vbs', '.exe', '.dll',
+    
+    # Unix/Linux executables & libraries
+    '.so', '.dylib', '.bin', '.elf',
+    
+    # Java
+    '.java', '.class', '.jar', '.war', '.ear',
+    
+    # C/C++
+    '.c', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.hxx',
+    
+    # PHP
+    '.php', '.php3', '.php4', '.php5', '.phtml',
+    
+    # Ruby
+    '.rb', '.rbw',
+    
+    # Go
+    '.go',
+    
+    # Rust
+    '.rs',
+    
+    # Web technologies (can contain malicious scripts)
+    '.html', '.htm', '.asp', '.aspx', '.jsp',
+    
+    # Configuration files (can contain malicious commands)
+    '.xml', '.json', '.yaml', '.yml', '.conf', '.config',
+    
+    # SQL files
+    '.sql',
+    
+    # Other scripting languages
+    '.pl', '.cgi', '.lua', '.tcl'
 }
 
 

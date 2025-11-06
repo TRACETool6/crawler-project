@@ -82,23 +82,66 @@ MALICIOUS_KEYWORDS = {
 
 #Code patterns that are suspicious (regex patterns)
 SUSPICIOUS_PATTERNS = [
+    # Python patterns
     r'eval\s*\(',  # Dynamic code execution
     r'exec\s*\(',  # Command execution
+    r'__import__\s*\(',  # Dynamic imports
+    r'compile\s*\(',  # Code compilation
+    
+    # General system patterns
     r'system\s*\(',  # System calls
     r'popen\s*\(',  # Process execution
     r'subprocess\.',  # Subprocess execution
     r'os\.system',  # OS system calls
-    r'__import__\s*\(',  # Dynamic imports
-    r'compile\s*\(',  # Code compilation
+    
+    # C/C++ patterns
     r'memcpy\s*\(',  # Memory manipulation
     r'strcpy\s*\(',  # Unsafe string operations
     r'gets\s*\(',  # Unsafe input
     r'scanf\s*\(',  # Unsafe input
-    r'CreateRemoteThread',  # Process injection
+    r'CreateRemoteThread',  # Process injection (Windows)
     r'VirtualAlloc',  # Memory allocation (Windows API)
     r'WriteProcessMemory',  # Memory writing
     r'OpenProcess',  # Process manipulation
     r'SetWindowsHook',  # Hooking
+    r'ptrace\s*\(',  # Process tracing (Unix)
+    
+    # Java patterns
+    r'Runtime\.getRuntime\(\)\.exec',  # Java command execution
+    r'ProcessBuilder',  # Java process execution
+    r'ClassLoader\.defineClass',  # Dynamic class loading
+    r'sun\.misc\.Unsafe',  # Unsafe operations
+    
+    # PHP patterns
+    r'shell_exec\s*\(',  # PHP command execution
+    r'passthru\s*\(',  # PHP command execution
+    r'base64_decode\s*\(',  # Often used for obfuscation
+    r'assert\s*\(',  # PHP assertion (can execute code)
+    r'create_function\s*\(',  # PHP dynamic function
+    r'preg_replace.*\/e',  # PHP regex with eval
+    
+    # PowerShell patterns
+    r'Invoke-Expression',  # PowerShell code execution
+    r'\bIEX\b',  # PowerShell alias for Invoke-Expression
+    r'-EncodedCommand',  # PowerShell encoded command
+    r'DownloadString',  # PowerShell web download
+    r'Start-Process',  # PowerShell process start
+    
+    # Ruby patterns
+    r'Kernel\.eval',  # Ruby code evaluation
+    r'instance_eval',  # Ruby instance evaluation
+    r'IO\.popen',  # Ruby process execution
+    
+    # Go patterns
+    r'os/exec\.Command',  # Go command execution
+    r'syscall\.Exec',  # Go syscall execution
+    
+    # SQL Injection patterns
+    r'UNION\s+SELECT',  # SQL injection
+    r"'\s*OR\s*'1'\s*=\s*'1",  # SQL injection
+    r'xp_cmdshell',  # SQL Server command execution
+    
+    # Network patterns (multi-language)
     r'socket\s*\(',  # Network sockets
     r'bind\s*\(',  # Network binding
     r'listen\s*\(',  # Network listening

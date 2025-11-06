@@ -565,6 +565,345 @@ CROSS_FILE_PATTERNS = {
      "Exploitation framework", 2.2),
 }
 
+#Java-specific malicious patterns
+WEIGHTED_KEYWORDS.extend([
+    WeightedKeyword(
+        keyword="Runtime.getRuntime().exec",
+        weight=8.0,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.8, Context.FUNCTION_NAME: 1.5},
+        description="Java command execution"
+    ),
+    WeightedKeyword(
+        keyword="ProcessBuilder",
+        weight=7.0,
+        severity=Severity.HIGH,
+        context_boost={Context.CLASS_NAME: 1.8, Context.VARIABLE_NAME: 1.5},
+        description="Java process execution"
+    ),
+    WeightedKeyword(
+        keyword="sun.misc.Unsafe",
+        weight=7.5,
+        severity=Severity.HIGH,
+        context_boost={Context.IMPORT: 2.0, Context.STRING_LITERAL: 1.5},
+        description="Java unsafe memory operations"
+    ),
+    WeightedKeyword(
+        keyword="ClassLoader.defineClass",
+        weight=8.0,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.8},
+        description="Java dynamic class loading"
+    ),
+    WeightedKeyword(
+        keyword="invokespecial",
+        weight=6.0,
+        severity=Severity.MEDIUM,
+        context_boost={Context.STRING_LITERAL: 1.5},
+        description="Java bytecode manipulation"
+    ),
+])
+
+#C/C++ specific malicious patterns
+WEIGHTED_KEYWORDS.extend([
+    WeightedKeyword(
+        keyword="system(",
+        weight=7.0,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.8, Context.FUNCTION_NAME: 1.5},
+        description="C/C++ system command execution"
+    ),
+    WeightedKeyword(
+        keyword="execve",
+        weight=8.5,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 2.0, Context.FUNCTION_NAME: 1.8},
+        description="Unix exec family - program execution"
+    ),
+    WeightedKeyword(
+        keyword="CreateRemoteThread",
+        weight=9.0,
+        severity=Severity.CRITICAL,
+        context_boost={Context.STRING_LITERAL: 2.0, Context.FUNCTION_NAME: 2.0},
+        description="Windows process injection"
+    ),
+    WeightedKeyword(
+        keyword="VirtualAllocEx",
+        weight=8.5,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 2.0, Context.FUNCTION_NAME: 1.8},
+        description="Windows memory allocation in remote process"
+    ),
+    WeightedKeyword(
+        keyword="WriteProcessMemory",
+        weight=8.5,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 2.0, Context.FUNCTION_NAME: 1.8},
+        description="Windows memory writing to remote process"
+    ),
+    WeightedKeyword(
+        keyword="ptrace",
+        weight=7.5,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.8, Context.FUNCTION_NAME: 1.5},
+        description="Unix process tracing/debugging"
+    ),
+    WeightedKeyword(
+        keyword="LD_PRELOAD",
+        weight=8.0,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 2.0, Context.VARIABLE_NAME: 1.8},
+        description="Unix library preloading for hooking"
+    ),
+    WeightedKeyword(
+        keyword="gets(",
+        weight=6.0,
+        severity=Severity.MEDIUM,
+        context_boost={Context.STRING_LITERAL: 1.5},
+        description="Unsafe C function - buffer overflow risk"
+    ),
+    WeightedKeyword(
+        keyword="strcpy(",
+        weight=5.0,
+        severity=Severity.MEDIUM,
+        context_boost={Context.STRING_LITERAL: 1.3},
+        excludes_context=["strncpy", "strcpy_s"],
+        description="Unsafe string copy - buffer overflow risk"
+    ),
+])
+
+#PHP-specific malicious patterns
+WEIGHTED_KEYWORDS.extend([
+    WeightedKeyword(
+        keyword="eval(",
+        weight=8.0,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.8, Context.FUNCTION_NAME: 1.5},
+        description="PHP dynamic code execution"
+    ),
+    WeightedKeyword(
+        keyword="base64_decode",
+        weight=6.0,
+        severity=Severity.MEDIUM,
+        context_boost={Context.STRING_LITERAL: 1.5},
+        requires_context=["eval", "exec", "system"],
+        description="PHP base64 decoding with execution"
+    ),
+    WeightedKeyword(
+        keyword="shell_exec",
+        weight=8.0,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.8, Context.FUNCTION_NAME: 1.5},
+        description="PHP shell command execution"
+    ),
+    WeightedKeyword(
+        keyword="passthru",
+        weight=7.5,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.8},
+        description="PHP command execution with output"
+    ),
+    WeightedKeyword(
+        keyword="assert(",
+        weight=7.0,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.5},
+        description="PHP assertion - can execute code"
+    ),
+    WeightedKeyword(
+        keyword="create_function",
+        weight=7.5,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.8},
+        description="PHP dynamic function creation"
+    ),
+    WeightedKeyword(
+        keyword="preg_replace",
+        weight=6.0,
+        severity=Severity.MEDIUM,
+        context_boost={Context.STRING_LITERAL: 1.5},
+        requires_context=["/e", "eval"],
+        description="PHP regex with code execution"
+    ),
+])
+
+#Ruby-specific malicious patterns
+WEIGHTED_KEYWORDS.extend([
+    WeightedKeyword(
+        keyword="Kernel.eval",
+        weight=8.0,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.8},
+        description="Ruby code evaluation"
+    ),
+    WeightedKeyword(
+        keyword="instance_eval",
+        weight=7.0,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.5},
+        description="Ruby instance evaluation"
+    ),
+    WeightedKeyword(
+        keyword="system(",
+        weight=7.5,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.8},
+        description="Ruby system command execution"
+    ),
+    WeightedKeyword(
+        keyword="IO.popen",
+        weight=7.5,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.8},
+        description="Ruby process execution"
+    ),
+    WeightedKeyword(
+        keyword="send(",
+        weight=5.0,
+        severity=Severity.MEDIUM,
+        context_boost={Context.STRING_LITERAL: 1.3},
+        requires_context=["method", "call"],
+        description="Ruby dynamic method invocation"
+    ),
+])
+
+#Go-specific malicious patterns
+WEIGHTED_KEYWORDS.extend([
+    WeightedKeyword(
+        keyword="os/exec.Command",
+        weight=7.5,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.8, Context.IMPORT: 1.5},
+        description="Go command execution"
+    ),
+    WeightedKeyword(
+        keyword="syscall.Exec",
+        weight=8.0,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.8},
+        description="Go direct syscall execution"
+    ),
+    WeightedKeyword(
+        keyword="unsafe.Pointer",
+        weight=7.0,
+        severity=Severity.MEDIUM,
+        context_boost={Context.STRING_LITERAL: 1.5, Context.VARIABLE_NAME: 1.3},
+        description="Go unsafe memory operations"
+    ),
+    WeightedKeyword(
+        keyword="reflect.Call",
+        weight=6.0,
+        severity=Severity.MEDIUM,
+        context_boost={Context.STRING_LITERAL: 1.5},
+        description="Go dynamic function invocation"
+    ),
+])
+
+#Rust-specific malicious patterns
+WEIGHTED_KEYWORDS.extend([
+    WeightedKeyword(
+        keyword="std::process::Command",
+        weight=7.5,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.8, Context.IMPORT: 1.5},
+        description="Rust command execution"
+    ),
+    WeightedKeyword(
+        keyword="unsafe {",
+        weight=6.0,
+        severity=Severity.MEDIUM,
+        context_boost={Context.STRING_LITERAL: 1.5},
+        description="Rust unsafe code block"
+    ),
+    WeightedKeyword(
+        keyword="libc::system",
+        weight=8.0,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.8},
+        description="Rust C library system call"
+    ),
+    WeightedKeyword(
+        keyword="std::mem::transmute",
+        weight=7.0,
+        severity=Severity.MEDIUM,
+        context_boost={Context.STRING_LITERAL: 1.5},
+        description="Rust type transmutation"
+    ),
+])
+
+#PowerShell-specific malicious patterns
+WEIGHTED_KEYWORDS.extend([
+    WeightedKeyword(
+        keyword="Invoke-Expression",
+        weight=8.0,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.8, Context.FUNCTION_NAME: 1.5},
+        description="PowerShell dynamic code execution"
+    ),
+    WeightedKeyword(
+        keyword="IEX",
+        weight=8.0,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.8},
+        description="PowerShell Invoke-Expression alias"
+    ),
+    WeightedKeyword(
+        keyword="Invoke-WebRequest",
+        weight=6.0,
+        severity=Severity.MEDIUM,
+        context_boost={Context.STRING_LITERAL: 1.5},
+        requires_context=["IEX", "Invoke-Expression", "downloadstring"],
+        description="PowerShell web download with execution"
+    ),
+    WeightedKeyword(
+        keyword="Start-Process",
+        weight=6.5,
+        severity=Severity.MEDIUM,
+        context_boost={Context.STRING_LITERAL: 1.5},
+        description="PowerShell process execution"
+    ),
+    WeightedKeyword(
+        keyword="-EncodedCommand",
+        weight=7.5,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.8, Context.STRING_LITERAL: 1.5},
+        description="PowerShell encoded command execution"
+    ),
+    WeightedKeyword(
+        keyword="DownloadString",
+        weight=7.0,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.5},
+        requires_context=["IEX", "Invoke"],
+        description="PowerShell download and execute"
+    ),
+])
+
+#SQL Injection patterns (multi-language)
+WEIGHTED_KEYWORDS.extend([
+    WeightedKeyword(
+        keyword="UNION SELECT",
+        weight=7.5,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 1.8, Context.COMMENT: 0.5},
+        description="SQL injection UNION attack"
+    ),
+    WeightedKeyword(
+        keyword="' OR '1'='1",
+        weight=8.0,
+        severity=Severity.HIGH,
+        context_boost={Context.STRING_LITERAL: 2.0},
+        description="SQL injection authentication bypass"
+    ),
+    WeightedKeyword(
+        keyword="xp_cmdshell",
+        weight=9.0,
+        severity=Severity.CRITICAL,
+        context_boost={Context.STRING_LITERAL: 2.0, Context.STRING_LITERAL: 1.8},
+        description="SQL Server command execution"
+    ),
+])
+
 
 def get_weighted_keyword_dict() -> Dict[str, WeightedKeyword]:
     """Convert list to dictionary for quick lookup"""
