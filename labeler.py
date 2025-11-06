@@ -830,7 +830,7 @@ class RepositoryLabelingPipeline:
                     (rel_path, full_path) for rel_path, full_path in extracted_files 
                     if rel_path in malicious_file_paths and self.extractor.should_scan_file(rel_path)
                 ]
-                logging.info(f"[{repo_name}] 🎯 OPTIMIZED MODE: Scanning {len(files_to_scan)} MALICIOUS files "
+                logging.info(f"[{repo_name}] OPTIMIZED MODE: Scanning {len(files_to_scan)} MALICIOUS files "
                            f"(out of {len(extracted_files)} total, skipping {len(extracted_files)-len(files_to_scan)} benign files)")
             else:
                 files_to_scan = [

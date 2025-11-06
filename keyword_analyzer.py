@@ -253,7 +253,7 @@ class YaraScanner:
                 results.append(result)
             
             if results:
-                logging.info(f"🎯 YARA matched {len(results)} rule(s) in {os.path.basename(file_path)}")
+                logging.info(f"YARA matched {len(results)} rule(s) in {os.path.basename(file_path)}")
             
             return results
             
