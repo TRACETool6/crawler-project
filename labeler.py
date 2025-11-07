@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Optional, Tuple
 import sqlite3
 from groq import Groq
+from keyword_analyzer import KeywordAnalyzer
 
 logging.basicConfig(
     filename="labeling_pipeline.log",
@@ -35,8 +36,47 @@ SUSPICIOUS_FILE_PATTERNS = [
 ]
 
 EXECUTABLE_EXTENSIONS = {
-    '.py', '.js', '.sh', '.bash', '.ps1', '.bat', '.cmd', '.vbs',
-    '.exe', '.dll', '.so', '.dylib', '.bin', '.elf'
+    # Python & JavaScript
+    '.py', '.js', '.jsx', '.ts', '.tsx',
+    
+    # Shell scripts
+    '.sh', '.bash', '.zsh', '.fish',
+    
+    # Windows scripts & executables
+    '.ps1', '.bat', '.cmd', '.vbs', '.exe', '.dll',
+    
+    # Unix/Linux executables & libraries
+    '.so', '.dylib', '.bin', '.elf',
+    
+    # Java
+    '.java', '.class', '.jar', '.war', '.ear',
+    
+    # C/C++
+    '.c', '.cpp', '.cc', '.cxx', '.h', '.hpp', '.hxx',
+    
+    # PHP
+    '.php', '.php3', '.php4', '.php5', '.phtml',
+    
+    # Ruby
+    '.rb', '.rbw',
+    
+    # Go
+    '.go',
+    
+    # Rust
+    '.rs',
+    
+    # Web technologies (can contain malicious scripts)
+    '.html', '.htm', '.asp', '.aspx', '.jsp',
+    
+    # Configuration files (can contain malicious commands)
+    '.xml', '.json', '.yaml', '.yml', '.conf', '.config',
+    
+    # SQL files
+    '.sql',
+    
+    # Other scripting languages
+    '.pl', '.cgi', '.lua', '.tcl'
 }
 
 
@@ -99,6 +139,19 @@ class LabelingDatabase:
         """)
         
         c.execute("""
+            CREATE TABLE IF NOT EXISTS KeywordPreScreen (
+                repo_name TEXT PRIMARY KEY,
+                keyword_score REAL,
+                pattern_score REAL,
+                combined_score REAL,
+                malicious_keywords_count INTEGER,
+                suspicious_patterns_count INTEGER,
+                is_suspicious BOOLEAN,
+                prescreen_date TEXT
+            )
+        """)
+        
+        c.execute("""
             CREATE TABLE IF NOT EXISTS RepositoryLabels (
                 repo_name TEXT PRIMARY KEY,
                 total_files INTEGER,
@@ -106,6 +159,8 @@ class LabelingDatabase:
                 suspicious_files INTEGER,
                 clean_files INTEGER,
                 file_level_score REAL,
+                keyword_based_score REAL,
+                passed_keyword_filter BOOLEAN,
                 llm_agent1_score REAL,
                 llm_agent1_reasoning TEXT,
                 llm_agent2_score REAL,
@@ -169,10 +224,11 @@ class LabelingDatabase:
             c.execute("""
                 INSERT OR REPLACE INTO RepositoryLabels 
                 (repo_name, total_files, malicious_files, suspicious_files, clean_files,
-                 file_level_score, llm_agent1_score, llm_agent1_reasoning,
+                 file_level_score, keyword_based_score, passed_keyword_filter,
+                 llm_agent1_score, llm_agent1_reasoning,
                  llm_agent2_score, llm_agent2_reasoning, final_consensus_score,
                  final_consensus_reasoning, is_malicious, labeling_date, processing_time_seconds)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 repo_name,
                 label_data.get('total_files'),
@@ -180,6 +236,8 @@ class LabelingDatabase:
                 label_data.get('suspicious_files'),
                 label_data.get('clean_files'),
                 label_data.get('file_level_score'),
+                label_data.get('keyword_based_score'),
+                label_data.get('passed_keyword_filter'),
                 label_data.get('llm_agent1_score'),
                 label_data.get('llm_agent1_reasoning'),
                 label_data.get('llm_agent2_score'),
@@ -194,6 +252,34 @@ class LabelingDatabase:
             logging.info(f"Saved repo label for {repo_name}")
         except Exception as e:
             logging.error(f"Error saving repo label for {repo_name}: {e}")
+        finally:
+            conn.close()
+    
+    def save_keyword_prescreen(self, repo_name: str, keyword_data: Dict):
+        """Save keyword pre-screening results"""
+        conn = sqlite3.connect(self.db_path)
+        c = conn.cursor()
+        
+        try:
+            c.execute("""
+                INSERT OR REPLACE INTO KeywordPreScreen 
+                (repo_name, keyword_score, pattern_score, combined_score,
+                 malicious_keywords_count, suspicious_patterns_count,
+                 is_suspicious, prescreen_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                repo_name,
+                keyword_data.get('keyword_score'),
+                keyword_data.get('pattern_score'),
+                keyword_data.get('combined_score'),
+                keyword_data.get('malicious_keywords_count'),
+                keyword_data.get('suspicious_patterns_count'),
+                keyword_data.get('is_suspicious'),
+                datetime.now().isoformat()
+            ))
+            conn.commit()
+        except Exception as e:
+            logging.error(f"Error saving keyword prescreen for {repo_name}: {e}")
         finally:
             conn.close()
     
@@ -605,7 +691,9 @@ Provide a risk score from 0-10 (0=safe, 10=highly malicious) and detailed reason
 
 
 class RepositoryLabelingPipeline:
-    def __init__(self, vt_api_keys: List[str], groq_api_keys: List[str], dataset_base_path: str, group_name: str):
+    def __init__(self, vt_api_keys: List[str], groq_api_keys: List[str], dataset_base_path: str, 
+                 group_name: str, use_keyword_filter: bool = True,
+                 scan_only_malicious_files: bool = True):
         self.key_rotator = APIKeyRotator(vt_api_keys, groq_api_keys)
         self.vt_analyzer = VirusTotalAnalyzer(self.key_rotator)
         self.llm_analyzer = LLMConsensusAnalyzer(self.key_rotator)
@@ -614,7 +702,18 @@ class RepositoryLabelingPipeline:
         self.dataset_base_path = dataset_base_path
         self.group_name = group_name
         self.temp_dir = tempfile.mkdtemp(prefix="vt_labeling_")
+        self.use_keyword_filter = use_keyword_filter
+        self.scan_only_malicious_files = scan_only_malicious_files
+        self.keyword_analyzer = KeywordAnalyzer() if use_keyword_filter else None
         logging.info(f"Pipeline initialized with temp dir: {self.temp_dir}")
+        if use_keyword_filter:
+            logging.info("Keyword-based pre-filtering ENABLED")
+            if scan_only_malicious_files:
+                logging.info("VirusTotal optimization: Scanning ONLY malicious files (file-level filtering)")
+            else:
+                logging.info("VirusTotal mode: Scanning ALL files in suspicious repositories")
+        else:
+            logging.info("Keyword-based pre-filtering DISABLED")
     
     def find_hdf5_files(self) -> List[Tuple[str, str]]:
         hdf5_files = []
@@ -671,6 +770,44 @@ class RepositoryLabelingPipeline:
             logging.info(f"Processing repository: {repo_name}")
             self.db.update_status(repo_name, "processing")
             
+            keyword_analysis = None
+            passed_keyword_filter = True
+            
+            if self.use_keyword_filter and self.keyword_analyzer:
+                logging.info(f"[{repo_name}] Running keyword pre-screening...")
+                
+                keyword_analysis = self.keyword_analyzer.analyze_repository(repo_name, hdf5_path)
+                
+                self.db.save_keyword_prescreen(repo_name, keyword_analysis)
+                
+                is_suspicious = keyword_analysis.get('is_suspicious', False)
+                passed_keyword_filter = is_suspicious
+                
+                if not is_suspicious:
+                    logging.info(f"[{repo_name}] NOT suspicious based on keywords. "
+                               f"Skipping VirusTotal scan. Score: {keyword_analysis['combined_score']:.3f}")
+                    
+                    repo_label = {
+                        'total_files': keyword_analysis.get('analyzed_files', 0),
+                        'malicious_files': 0,
+                        'suspicious_files': 0,
+                        'clean_files': keyword_analysis.get('analyzed_files', 0),
+                        'file_level_score': 0.0,
+                        'keyword_based_score': keyword_analysis['combined_score'],
+                        'passed_keyword_filter': False,
+                        'is_malicious': False,
+                        'processing_time': time.time() - start_time
+                    }
+                    
+                    self.db.save_repo_label(repo_name, repo_label)
+                    self.db.update_status(repo_name, "completed_keyword_filter")
+                    return True
+                else:
+                    logging.info(f"[{repo_name}] SUSPICIOUS based on keywords! "
+                               f"Proceeding to VirusTotal scan. Score: {keyword_analysis['combined_score']:.3f}, "
+                               f"Malicious keywords: {keyword_analysis['malicious_keywords_count']}, "
+                               f"Suspicious patterns: {keyword_analysis['suspicious_patterns_count']}")
+            
             repo_temp_dir = os.path.join(self.temp_dir, repo_name)
             extracted_files = self.extractor.extract_files_from_hdf5(hdf5_path, repo_temp_dir)
             
@@ -678,10 +815,30 @@ class RepositoryLabelingPipeline:
                 self.db.update_status(repo_name, "failed", "No files extracted")
                 return False
             
-            files_to_scan = [(rel_path, full_path) for rel_path, full_path in extracted_files 
-                            if self.extractor.should_scan_file(rel_path)]
+            file_scores = keyword_analysis.get('file_scores', []) if keyword_analysis else []
+            malicious_file_paths = set()
             
-            logging.info(f"Scanning {len(files_to_scan)}/{len(extracted_files)} files for {repo_name}")
+            if file_scores and self.scan_only_malicious_files:
+                for file_score in file_scores:
+                    if file_score['is_malicious']:
+                        malicious_file_paths.add(file_score['file_path'])
+                
+                logging.info(f"[{repo_name}] {len(malicious_file_paths)} files marked as malicious by keyword analysis")
+            
+            if malicious_file_paths and self.scan_only_malicious_files:
+                files_to_scan = [
+                    (rel_path, full_path) for rel_path, full_path in extracted_files 
+                    if rel_path in malicious_file_paths and self.extractor.should_scan_file(rel_path)
+                ]
+                logging.info(f"[{repo_name}] OPTIMIZED MODE: Scanning {len(files_to_scan)} MALICIOUS files "
+                           f"(out of {len(extracted_files)} total, skipping {len(extracted_files)-len(files_to_scan)} benign files)")
+            else:
+                files_to_scan = [
+                    (rel_path, full_path) for rel_path, full_path in extracted_files 
+                    if self.extractor.should_scan_file(rel_path)
+                ]
+                mode = "full scan" if not self.scan_only_malicious_files else "no file scores available"
+                logging.info(f"[{repo_name}] Scanning {len(files_to_scan)}/{len(extracted_files)} files ({mode})")
             
             file_results = []
             for file_path, full_path in files_to_scan:
@@ -696,6 +853,15 @@ class RepositoryLabelingPipeline:
                 shutil.rmtree(repo_temp_dir, ignore_errors=True)
                 return False
             
+            total_files = len(extracted_files)
+            scanned_files = len(files_to_scan)
+            skipped_files = total_files - scanned_files
+            if skipped_files > 0:
+                savings_pct = (skipped_files / total_files) * 100
+                logging.info(f"[{repo_name}] VirusTotal scan optimization: "
+                           f"Skipped {skipped_files}/{total_files} files ({savings_pct:.1f}% reduction) "
+                           f"by only scanning malicious files")
+            
             file_labels = self.db.get_file_labels(repo_name)
             
             malicious_files = sum(1 for f in file_labels if f['is_malicious'])
@@ -703,6 +869,7 @@ class RepositoryLabelingPipeline:
             clean_files = len(file_labels) - malicious_files - suspicious_files
             
             file_level_score = (malicious_files * 10 + suspicious_files * 5) / max(len(file_labels), 1)
+            keyword_score = keyword_analysis['combined_score'] if keyword_analysis else 0.0
             
             repo_label = {
                 'total_files': len(file_labels),
@@ -710,6 +877,8 @@ class RepositoryLabelingPipeline:
                 'suspicious_files': suspicious_files,
                 'clean_files': clean_files,
                 'file_level_score': file_level_score,
+                'keyword_based_score': keyword_score,
+                'passed_keyword_filter': passed_keyword_filter,
                 'processing_time': time.time() - start_time
             }
             
@@ -751,7 +920,6 @@ class RepositoryLabelingPipeline:
         if not hdf5_files:
             logging.warning("No HDF5 files found")
             return
-        
         total = len(hdf5_files)
         successful = 0
         failed = 0
@@ -820,11 +988,14 @@ def main():
         print("No Groq API keys found, running without LLM analysis")
         logging.warning("Groq API keys not configured, skipping LLM analysis")
     
+
     pipeline = RepositoryLabelingPipeline(
         vt_api_keys=VT_API_KEYS,
         groq_api_keys=GROQ_API_KEYS,
         dataset_base_path=DATASET_BASE_PATH,
-        group_name=GROUP_NAME
+        group_name=GROUP_NAME,
+        use_keyword_filter=True,        
+        scan_only_malicious_files=True   
     )
     
     try:
