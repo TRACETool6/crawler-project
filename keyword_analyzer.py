@@ -1,9 +1,3 @@
-"""
-Advanced Keyword-based Malicious Repository Detection
-Uses weighted keywords, YARA-style rules, context analysis, and co-occurrence patterns
-to detect potentially malicious repositories before VirusTotal scanning.
-"""
-
 import os
 import re
 import json
@@ -18,7 +12,17 @@ from pathlib import Path
 import warnings
 warnings.filterwarnings('ignore')
 
-# Try to import YARA
+os.environ['USE_TF'] = '0'
+os.environ['USE_TORCH'] = '1'
+
+try:
+    from transformers import AutoTokenizer, AutoModel
+    import torch
+    BERT_AVAILABLE = True
+except ImportError:
+    BERT_AVAILABLE = False
+    logging.warning("BERT not available. Install with: pip install transformers torch")
+
 try:
     import yara
     YARA_AVAILABLE = True
@@ -624,6 +628,146 @@ class KeywordDatabase:
         finally:
             conn.close()
 
+class BERTKeywordEmbedder:
+    """
+    Generate BERT-based feature embeddings from keyword sets.
+    
+    Feed the keyword set of each repository to BERT to obtain 
+    a keyword-based feature embedding for downstream analysis.
+    """
+    
+    def __init__(self, model_name: str = "bert-base-uncased"):
+        """
+        Initialize BERT embedder
+        
+        Args:
+            model_name: Name of the BERT model to use
+        """
+        self.bert_available = BERT_AVAILABLE
+        self.model = None
+        self.tokenizer = None
+        self.device = None
+        
+        if self.bert_available:
+            try:
+                logging.info(f"Loading BERT model: {model_name}")
+                self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+                self.model = AutoModel.from_pretrained(model_name)
+                
+                self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+                self.model.to(self.device)
+                self.model.eval()
+                
+                logging.info(f"BERT model loaded successfully on {self.device}")
+            except Exception as e:
+                logging.error(f"Failed to load BERT model: {e}")
+                self.bert_available = False
+        else:
+            logging.warning("BERT not available. Keyword embeddings will not be generated.")
+    
+    def encode_keywords(self, keywords: List[str], aggregate: str = 'mean') -> Optional[np.ndarray]:
+        """
+        Generate BERT embedding from a list of keywords
+        
+        Args:
+            keywords: List of malicious keywords extracted from repository
+            aggregate: How to aggregate token embeddings ('mean', 'max', 'cls')
+        
+        Returns:
+            Numpy array of shape (768,) representing the keyword-based embedding,
+            or None if BERT is not available
+        """
+        if not self.bert_available or not keywords:
+            return None
+        
+        try:
+            keyword_text = " ".join(keywords)
+            
+            inputs = self.tokenizer(
+                keyword_text,
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+                max_length=512
+            )
+            
+            inputs = {k: v.to(self.device) for k, v in inputs.items()}
+            
+            with torch.no_grad():
+                outputs = self.model(**inputs)
+                last_hidden_state = outputs.last_hidden_state  #Shape: (1, seq_len, 768)
+            
+            if aggregate == 'mean':
+                #Mean pooling over all tokens
+                embedding = last_hidden_state.mean(dim=1).squeeze(0)
+            elif aggregate == 'max':
+                #Max pooling over all tokens
+                embedding = last_hidden_state.max(dim=1)[0].squeeze(0)
+            elif aggregate == 'cls':
+                #Use [CLS] token embedding
+                embedding = last_hidden_state[:, 0, :].squeeze(0)
+            else:
+                raise ValueError(f"Unknown aggregation method: {aggregate}")
+            
+            embedding_np = embedding.cpu().numpy()
+            
+            return embedding_np
+            
+        except Exception as e:
+            logging.error(f"Error generating BERT embedding: {e}")
+            return None
+    
+    def encode_repository_keywords(self, 
+                                   keyword_data: Dict[str, List[str]], 
+                                   aggregate: str = 'mean') -> Optional[np.ndarray]:
+        """
+        Generate BERT embedding for repository from file-level keywords
+        
+        Args:
+            keyword_data: Dict mapping file paths to their extracted keywords
+            aggregate: Aggregation method for token embeddings
+        
+        Returns:
+            Repository-level BERT embedding or None
+        """
+        if not self.bert_available:
+            return None
+        
+        all_keywords = set()
+        for file_keywords in keyword_data.values():
+            all_keywords.update(file_keywords)
+        
+        #Generate embedding from keyword set
+        if all_keywords:
+            return self.encode_keywords(list(all_keywords), aggregate=aggregate)
+        
+        return None
+    
+    def batch_encode_keywords(self, 
+                             keyword_lists: List[List[str]], 
+                             aggregate: str = 'mean') -> Optional[np.ndarray]:
+        """
+        Generate BERT embeddings for multiple keyword sets (batch processing)
+        
+        Args:
+            keyword_lists: List of keyword lists (one per repository)
+            aggregate: Aggregation method
+        
+        Returns:
+            Numpy array of shape (n_repos, 768) or None
+        """
+        if not self.bert_available or not keyword_lists:
+            return None
+        
+        embeddings = []
+        for keywords in keyword_lists:
+            emb = self.encode_keywords(keywords, aggregate=aggregate)
+            if emb is not None:
+                embeddings.append(emb)
+            else:
+                embeddings.append(np.zeros(768))
+        
+        return np.array(embeddings)
 
 class KeywordExtractor:
     """Extract and analyze keywords from source code files with advanced scoring"""
@@ -910,14 +1054,29 @@ class KeywordExtractor:
 
 
 class KeywordAnalyzer:
-    """Main keyword analysis pipeline with YARA-style rules and advanced scoring"""
+    """
+    Main keyword analysis pipeline with YARA-style rules and advanced scoring
     
-    def __init__(self, use_real_yara: bool = True):
+    Includes BERT-based keyword embedding generation for feature representation
+    """
+    
+    def __init__(self, use_real_yara: bool = True, use_bert: bool = False):
         self.keyword_extractor = KeywordExtractor()
         self.db = KeywordDatabase()
         self.yara_rules = YARA_RULES
         self.cross_file_patterns = CROSS_FILE_PATTERNS
-        
+        self.bert_embedder = None
+        self.use_bert = use_bert
+        if use_bert and BERT_AVAILABLE:
+            try:
+                self.bert_embedder = BERTKeywordEmbedder()
+                logging.info("BERT keyword embedder initialized")
+            except Exception as e:
+                logging.warning(f"Failed to initialize BERT embedder: {e}")
+                self.use_bert = False
+        elif use_bert and not BERT_AVAILABLE:
+            logging.warning("BERT requested but not available. Install with: pip install transformers torch")
+            self.use_bert = False
         self.real_yara = None
         if use_real_yara and YARA_AVAILABLE:
             try:
@@ -936,7 +1095,6 @@ class KeywordAnalyzer:
             elif not YARA_AVAILABLE:
                 logging.info("Real YARA scanner not available (install yara-python)")
         
-        #Thresholds for determining suspiciousness 
         self.weighted_score_threshold = 50.0  #Weighted score threshold
         self.critical_keyword_threshold = 1   #Even 1 critical keyword is suspicious
         self.yara_rule_match_threshold = 1    #Number of YARA rules to trigger
@@ -1154,6 +1312,24 @@ class KeywordAnalyzer:
             suspicion_reasons.append(f"Suspicious patterns: {pattern_count}")
         
         embedding_vector = None
+        if self.use_bert and self.bert_embedder:
+            try:
+                malicious_keywords_list = list(all_malicious_keywords_weighted.keys())
+                
+                if malicious_keywords_list:
+                    logging.info(f"[{repo_name}] Generating BERT embedding from {len(malicious_keywords_list)} keywords")
+                    embedding_vector = self.bert_embedder.encode_keywords(
+                        malicious_keywords_list, 
+                        aggregate='mean'
+                    )
+                    
+                    if embedding_vector is not None:
+                        logging.info(f"[{repo_name}] BERT embedding generated: shape {embedding_vector.shape}")
+                    else:
+                        logging.warning(f"[{repo_name}] Failed to generate BERT embedding")
+            except Exception as e:
+                logging.error(f"[{repo_name}] Error generating BERT embedding: {e}")
+                embedding_vector = None
 
         analysis_data = {
             'repo_name': repo_name,
@@ -1175,7 +1351,7 @@ class KeywordAnalyzer:
             'weighted_score': combined_weighted_score,  #Raw weighted score
             'is_suspicious': is_suspicious,
             'suspicion_reasons': suspicion_reasons,
-            'embedding_vector': embedding_vector or [],
+            'embedding_vector': embedding_vector.tolist() if embedding_vector is not None else [],
             'file_scores': file_scores_list,  #Individual file malicious scores
             'files_analyzed': len(file_scores_list),
             'malicious_files_count': sum(1 for fs in file_scores_list if fs['is_malicious']),

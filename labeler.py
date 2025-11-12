@@ -704,7 +704,7 @@ class RepositoryLabelingPipeline:
         self.temp_dir = tempfile.mkdtemp(prefix="vt_labeling_")
         self.use_keyword_filter = use_keyword_filter
         self.scan_only_malicious_files = scan_only_malicious_files
-        self.keyword_analyzer = KeywordAnalyzer() if use_keyword_filter else None
+        self.keyword_analyzer = KeywordAnalyzer(use_bert=True) if use_keyword_filter else None
         logging.info(f"Pipeline initialized with temp dir: {self.temp_dir}")
         if use_keyword_filter:
             logging.info("Keyword-based pre-filtering ENABLED")
