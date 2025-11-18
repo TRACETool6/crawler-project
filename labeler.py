@@ -12,7 +12,6 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Optional, Tuple
 import sqlite3
-from groq import Groq
 from keyword_analyzer import KeywordAnalyzer
 
 logging.basicConfig(
@@ -26,6 +25,7 @@ LABELING_DB_PATH = "labeling_db.sqlite"
 VT_API_URL_FILES = "https://www.virustotal.com/api/v3/files"
 VT_API_URL_ANALYSES = "https://www.virustotal.com/api/v3/analyses/{}"
 VT_API_URL_FILE_HASH = "https://www.virustotal.com/api/v3/files/{}"
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 MALICIOUS_THRESHOLD = 3
 SUSPICIOUS_THRESHOLD = 2
@@ -558,36 +558,35 @@ class VirusTotalAnalyzer:
 class LLMConsensusAnalyzer:
     def __init__(self, key_rotator: APIKeyRotator):
         self.key_rotator = key_rotator
-        self.groq_clients = {}
-        self._init_clients()
     
-    def _init_clients(self):
-        for key in self.key_rotator.groq_keys:
-            self.groq_clients[key] = Groq(api_key=key)
-    
-    def call_groq(self, messages: List[Dict], model: str = "openai/gpt-oss-120b") -> Optional[str]:
+    def call_groq(self, messages: List[Dict], model: str = "llama-3.3-70b-versatile") -> Optional[str]:
         api_key = self.key_rotator.get_groq_key()
         if not api_key:
             logging.warning("No Groq API key available")
             return None
         
-        client = self.groq_clients.get(api_key)
-        if not client:
-            client = Groq(api_key=api_key)
-            self.groq_clients[api_key] = client
+        headers = {
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": 0.7,
+            "max_tokens": 2000
+        }
         
         try:
-            chat_completion = client.chat.completions.create(
-                messages=messages,
-                model=model,
-                temperature=0.7,
-                max_tokens=2000
-            )
+            response = requests.post(GROQ_API_URL, headers=headers, json=payload, timeout=60)
+            response.raise_for_status()
             
-            content = chat_completion.choices[0].message.content
+            result = response.json()
+            content = result.get("choices", [{}])[0].get("message", {}).get("content", "")
+            
             return content
             
-        except Exception as e:
+        except requests.exceptions.RequestException as e:
             logging.error(f"Groq API error: {e}")
             return None
     
@@ -920,6 +919,7 @@ class RepositoryLabelingPipeline:
         if not hdf5_files:
             logging.warning("No HDF5 files found")
             return
+        
         total = len(hdf5_files)
         successful = 0
         failed = 0
@@ -988,7 +988,6 @@ def main():
         print("No Groq API keys found, running without LLM analysis")
         logging.warning("Groq API keys not configured, skipping LLM analysis")
     
-
     pipeline = RepositoryLabelingPipeline(
         vt_api_keys=VT_API_KEYS,
         groq_api_keys=GROQ_API_KEYS,
