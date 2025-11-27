@@ -431,7 +431,7 @@ class VirusTotalAnalyzer:
             logging.error(f"Error checking hash: {e}")
             return None
     
-    def submit_file(self, file_path: str) -> Optional[str]:
+    def submit_file(self, file_path: str) -> Optional[Tuple[str, str]]:
         if not os.path.exists(file_path):
             logging.error(f"File not found: {file_path}")
             return None
@@ -465,7 +465,7 @@ class VirusTotalAnalyzer:
                     analysis_id = response.json().get("data", {}).get("id")
                     if analysis_id:
                         logging.info(f"File submitted, analysis ID: {analysis_id}")
-                        return analysis_id
+                        return (analysis_id, api_key)
                     else:
                         logging.error("Could not get analysis ID")
                         return None
@@ -477,10 +477,9 @@ class VirusTotalAnalyzer:
                     
         return None
     
-    def get_analysis_report(self, analysis_id: str, max_wait_time: int = 300) -> Optional[Dict]:
+    def get_analysis_report(self, analysis_id: str, api_key: str, max_wait_time: int = 300) -> Optional[Dict]:
         logging.info(f"Waiting for analysis {analysis_id}")
         
-        api_key = self.key_rotator.get_vt_key()
         headers = {"x-apikey": api_key}
         url = VT_API_URL_ANALYSES.format(analysis_id)
         
@@ -492,8 +491,7 @@ class VirusTotalAnalyzer:
                 response = requests.get(url, headers=headers, timeout=30)
                 
                 if response.status_code == 429:
-                    api_key = self.key_rotator.get_vt_key()
-                    headers = {"x-apikey": api_key}
+                    logging.warning("Rate limit hit, waiting longer before retry")
                     time.sleep(15)
                     continue
                 
@@ -692,7 +690,7 @@ Provide a risk score from 0-10 (0=safe, 10=highly malicious) and detailed reason
 class RepositoryLabelingPipeline:
     def __init__(self, vt_api_keys: List[str], groq_api_keys: List[str], dataset_base_path: str, 
                  group_name: str, use_keyword_filter: bool = True,
-                 scan_only_malicious_files: bool = True):
+                 scan_only_malicious_files: bool = True, max_repos: int = None):
         self.key_rotator = APIKeyRotator(vt_api_keys, groq_api_keys)
         self.vt_analyzer = VirusTotalAnalyzer(self.key_rotator)
         self.llm_analyzer = LLMConsensusAnalyzer(self.key_rotator)
@@ -703,8 +701,11 @@ class RepositoryLabelingPipeline:
         self.temp_dir = tempfile.mkdtemp(prefix="vt_labeling_")
         self.use_keyword_filter = use_keyword_filter
         self.scan_only_malicious_files = scan_only_malicious_files
+        self.max_repos = max_repos
         self.keyword_analyzer = KeywordAnalyzer() if use_keyword_filter else None
         logging.info(f"Pipeline initialized with temp dir: {self.temp_dir}")
+        if max_repos:
+            logging.info(f"Max repositories to process: {max_repos}")
         if use_keyword_filter:
             logging.info("Keyword-based pre-filtering ENABLED")
             if scan_only_malicious_files:
@@ -743,11 +744,12 @@ class RepositoryLabelingPipeline:
             logging.info(f"Using existing VT report for {file_path}")
             parsed = self.vt_analyzer.parse_report(existing_report)
         else:
-            analysis_id = self.vt_analyzer.submit_file(full_path)
-            if not analysis_id:
+            submit_result = self.vt_analyzer.submit_file(full_path)
+            if not submit_result:
                 return None
             
-            report = self.vt_analyzer.get_analysis_report(analysis_id)
+            analysis_id, api_key = submit_result
+            report = self.vt_analyzer.get_analysis_report(analysis_id, api_key)
             if not report:
                 return None
             
@@ -920,6 +922,11 @@ class RepositoryLabelingPipeline:
             logging.warning("No HDF5 files found")
             return
         
+        # Apply max_repos limit if specified
+        if self.max_repos and len(hdf5_files) > self.max_repos:
+            logging.info(f"Limiting to {self.max_repos} repositories (found {len(hdf5_files)} total)")
+            hdf5_files = hdf5_files[:self.max_repos]
+        
         total = len(hdf5_files)
         successful = 0
         failed = 0
@@ -978,6 +985,7 @@ def main():
     
     DATASET_BASE_PATH = "fivekdataset"
     GROUP_NAME = "all_repos_fivek"
+    MAX_REPOS = None  # Set to an integer to limit number of repos, or None for no limit
     
     if not VT_API_KEYS or len(VT_API_KEYS) == 0:
         print("Configure your VT API keys first")
@@ -994,7 +1002,8 @@ def main():
         dataset_base_path=DATASET_BASE_PATH,
         group_name=GROUP_NAME,
         use_keyword_filter=True,        
-        scan_only_malicious_files=True   
+        scan_only_malicious_files=True,
+        max_repos=MAX_REPOS
     )
     
     try:
