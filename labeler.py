@@ -983,9 +983,9 @@ def main():
     VT_API_KEYS = get_vt_keys()
     GROQ_API_KEYS = get_groq_keys()
     
-    DATASET_BASE_PATH = "fivekdataset"
+    DATASET_BASE_PATH = os.path.expanduser("~/scratch/crawler/subset")
     GROUP_NAME = "all_repos_fivek"
-    MAX_REPOS = None  # Set to an integer to limit number of repos, or None for no limit
+    MAX_REPOS = 100  # Set to an integer to limit number of repos, or None for no limit
     
     if not VT_API_KEYS or len(VT_API_KEYS) == 0:
         print("Configure your VT API keys first")
