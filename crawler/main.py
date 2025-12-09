@@ -20,6 +20,7 @@ TARGET_REPOS = 15000
 MAX_CLONE_THREADS = 10
 MAX_PROCESS_WORKERS = os.cpu_count() or 4
 MAX_RETRIES = 3
+CRAWL_LANGUAGES = ['Python', 'JavaScript', 'Go', 'TypeScript', 'Java', 'C', 'C++', 'Ruby', 'PHP', 'Rust']
 
 
 def retry_clone_repo(full_name, retries=MAX_RETRIES):
@@ -80,7 +81,7 @@ def crawl_loop():
         if to_fetch <= 0:
             break
 
-        repos_to_process = get_repo_batch(seen_repos, to_fetch)
+        repos_to_process = get_repo_batch(seen_repos, to_fetch, languages=CRAWL_LANGUAGES)
         if not repos_to_process:
             logging.warning("No new repos. Waiting.")
             time.sleep(60)

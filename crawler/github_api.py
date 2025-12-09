@@ -27,7 +27,9 @@ HEADERS = {
 
 SEARCH_API = "https://api.github.com/search/repositories"
 
-def get_repo_batch(seen_repos, limit):
+SUPPORTED_LANGUAGES = ['Python', 'JavaScript', 'Go', 'TypeScript', 'Java', 'C', 'C++', 'Ruby', 'PHP', 'Rust']
+
+def get_repo_batch(seen_repos, limit, languages=None):
     """
     Fetches a batch of repositories from GitHub, excluding those already seen.
     It iterates through time periods and pages within each period, saving its state
@@ -37,11 +39,15 @@ def get_repo_batch(seen_repos, limit):
         seen_repos (set): A set of full repository names (e.g., 'owner/repo')
                           that have already been crawled.
         limit (int): The maximum number of new repositories to fetch in this batch.
+        languages (list): Optional list of programming languages to filter by.
 
     Returns:
         list: A list of full repository names (strings) up to the specified limit.
     """
+    if languages is None:
+        languages = SUPPORTED_LANGUAGES
     logging.info(f"API Fetcher: Attempting to fetch a batch of up to {limit} new repositories by iterating through time.")
+    logging.info(f"API Fetcher: Filtering for languages: {', '.join(languages)}")
     repos = []
     
     last_crawled_date, last_crawled_page = load_crawler_state()
@@ -64,6 +70,9 @@ def get_repo_batch(seen_repos, limit):
         start_date_str = start_date.strftime('%Y-%m-%d')
 
         time_query = f"created:{start_date_str}..{end_date_str}"
+        language_query = " ".join([f"language:{lang}" for lang in languages])
+        full_query = f"{time_query} {language_query}"
+        
         logging.info(f"API Fetcher: Querying GitHub for repos created between {start_date_str} and {end_date_str}. Current found: {len(repos)}")
 
         page = initial_page 
@@ -71,7 +80,7 @@ def get_repo_batch(seen_repos, limit):
 
         while True:
             params = {
-                "q": time_query, 
+                "q": full_query, 
                 "sort": "updated", 
                 "order": "desc",
                 "per_page": per_page,

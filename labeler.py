@@ -13,6 +13,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import List, Dict, Optional, Tuple
 import sqlite3
 from keyword_analyzer import KeywordAnalyzer
+from behavioral_analyzer import BehavioralAnalysisPipeline
 
 logging.basicConfig(
     filename="labeling_pipeline.log",
@@ -167,7 +168,10 @@ class LabelingDatabase:
                 llm_agent2_reasoning TEXT,
                 final_consensus_score REAL,
                 final_consensus_reasoning TEXT,
+                behavioral_analysis_result TEXT,
+                behavioral_analysis_triggered BOOLEAN,
                 is_malicious BOOLEAN,
+                malicious_reason TEXT,
                 labeling_date TEXT,
                 processing_time_seconds REAL
             )
@@ -221,14 +225,19 @@ class LabelingDatabase:
         c = conn.cursor()
         
         try:
+            behavioral_analysis_result = label_data.get('behavioral_analysis')
+            behavioral_analysis_json = json.dumps(behavioral_analysis_result) if behavioral_analysis_result else None
+            behavioral_analysis_triggered = behavioral_analysis_result is not None
+            
             c.execute("""
                 INSERT OR REPLACE INTO RepositoryLabels 
                 (repo_name, total_files, malicious_files, suspicious_files, clean_files,
                  file_level_score, keyword_based_score, passed_keyword_filter,
                  llm_agent1_score, llm_agent1_reasoning,
                  llm_agent2_score, llm_agent2_reasoning, final_consensus_score,
-                 final_consensus_reasoning, is_malicious, labeling_date, processing_time_seconds)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 final_consensus_reasoning, behavioral_analysis_result, behavioral_analysis_triggered,
+                 is_malicious, malicious_reason, labeling_date, processing_time_seconds)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 repo_name,
                 label_data.get('total_files'),
@@ -244,7 +253,10 @@ class LabelingDatabase:
                 label_data.get('llm_agent2_reasoning'),
                 label_data.get('final_consensus_score'),
                 label_data.get('final_consensus_reasoning'),
+                behavioral_analysis_json,
+                behavioral_analysis_triggered,
                 label_data.get('is_malicious'),
+                label_data.get('malicious_reason'),
                 datetime.now().isoformat(),
                 label_data.get('processing_time')
             ))
@@ -690,7 +702,8 @@ Provide a risk score from 0-10 (0=safe, 10=highly malicious) and detailed reason
 class RepositoryLabelingPipeline:
     def __init__(self, vt_api_keys: List[str], groq_api_keys: List[str], dataset_base_path: str, 
                  group_name: str, use_keyword_filter: bool = True,
-                 scan_only_malicious_files: bool = True, max_repos: int = None):
+                 scan_only_malicious_files: bool = True, max_repos: int = None,
+                 enable_behavioral_analysis: bool = True):
         self.key_rotator = APIKeyRotator(vt_api_keys, groq_api_keys)
         self.vt_analyzer = VirusTotalAnalyzer(self.key_rotator)
         self.llm_analyzer = LLMConsensusAnalyzer(self.key_rotator)
@@ -702,7 +715,23 @@ class RepositoryLabelingPipeline:
         self.use_keyword_filter = use_keyword_filter
         self.scan_only_malicious_files = scan_only_malicious_files
         self.max_repos = max_repos
+        self.enable_behavioral_analysis = enable_behavioral_analysis
         self.keyword_analyzer = KeywordAnalyzer() if use_keyword_filter else None
+        
+        if enable_behavioral_analysis and groq_api_keys:
+            vt_key = vt_api_keys[0] if vt_api_keys else None
+            llm_key = groq_api_keys[0] if groq_api_keys else None
+            if vt_key and llm_key:
+                self.behavioral_analyzer = BehavioralAnalysisPipeline(vt_key, llm_key)
+                logging.info("Behavioral analysis ENABLED")
+            else:
+                self.behavioral_analyzer = None
+                logging.warning("Behavioral analysis DISABLED (missing API keys)")
+        else:
+            self.behavioral_analyzer = None
+            if not enable_behavioral_analysis:
+                logging.info("Behavioral analysis DISABLED by configuration")
+        
         logging.info(f"Pipeline initialized with temp dir: {self.temp_dir}")
         if max_repos:
             logging.info(f"Max repositories to process: {max_repos}")
@@ -898,6 +927,50 @@ class RepositoryLabelingPipeline:
             else:
                 repo_label['is_malicious'] = file_level_score >= 5.0
             
+            if not repo_label['is_malicious'] and self.behavioral_analyzer and malicious_files == 0:
+                logging.info(f"[{repo_name}] Stage 3: Repository appears benign, triggering behavioral analysis")
+                
+                try:
+                    behavioral_output_dir = os.path.join(self.temp_dir, f"{repo_name}_behavioral")
+                    os.makedirs(behavioral_output_dir, exist_ok=True)
+                    
+                    behavioral_result = self.behavioral_analyzer.analyze_repository(
+                        repo_temp_dir,
+                        behavioral_output_dir
+                    )
+                    
+                    repo_label['behavioral_analysis'] = behavioral_result
+                    
+                    if behavioral_result.get('success'):
+                        vt_results = behavioral_result.get('vt_results', [])
+                        behavioral_malicious = False
+                        
+                        for vt_result in vt_results:
+                            if vt_result.get('vt_result', {}).get('static_report'):
+                                static_report = vt_result['vt_result']['static_report']
+                                stats = static_report.get('data', {}).get('attributes', {}).get('stats', {})
+                                malicious_count = stats.get('malicious', 0)
+                                
+                                if malicious_count >= MALICIOUS_THRESHOLD:
+                                    behavioral_malicious = True
+                                    logging.warning(f"[{repo_name}] Behavioral analysis detected malicious executable: {vt_result['variant_name']}")
+                                    break
+                        
+                        if behavioral_malicious:
+                            repo_label['is_malicious'] = True
+                            repo_label['malicious_reason'] = 'behavioral_analysis'
+                            logging.warning(f"[{repo_name}] MARKED AS MALICIOUS by behavioral analysis")
+                        else:
+                            logging.info(f"[{repo_name}] Behavioral analysis: No malicious executables detected")
+                    else:
+                        logging.warning(f"[{repo_name}] Behavioral analysis failed: {behavioral_result.get('error')}")
+                    
+                    shutil.rmtree(behavioral_output_dir, ignore_errors=True)
+                
+                except Exception as e:
+                    logging.error(f"[{repo_name}] Error in behavioral analysis: {e}")
+                    repo_label['behavioral_analysis_error'] = str(e)
+            
             self.db.save_repo_label(repo_name, repo_label)
             self.db.update_status(repo_name, "completed")
             
@@ -1003,7 +1076,8 @@ def main():
         group_name=GROUP_NAME,
         use_keyword_filter=True,        
         scan_only_malicious_files=True,
-        max_repos=MAX_REPOS
+        max_repos=MAX_REPOS,
+        enable_behavioral_analysis=True
     )
     
     try:
