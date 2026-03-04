@@ -94,6 +94,7 @@ class APIKeyRotator:
         key = self.vt_keys[self.vt_index]
         self.vt_index = (self.vt_index + 1) % len(self.vt_keys)
         self.vt_key_usage[key]["calls"] += 1
+        logging.debug(f"Using VT key index {self.vt_index - 1 if self.vt_index > 0 else len(self.vt_keys) - 1}, length: {len(key)}, first 8 chars: {key[:8]}...")
         return key
     
     def get_groq_key(self) -> str:
@@ -415,33 +416,39 @@ class VirusTotalAnalyzer:
         self.key_rotator = key_rotator
     
     def check_hash_exists(self, file_hash: str) -> Optional[Dict]:
-        api_key = self.key_rotator.get_vt_key()
-        headers = {"x-apikey": api_key}
-        url = VT_API_URL_FILE_HASH.format(file_hash)
-        
-        try:
-            response = requests.get(url, headers=headers, timeout=30)
-            
-            if response.status_code == 200:
-                logging.info(f"Hash {file_hash[:8]}... found in VT database")
-                return response.json()
-            elif response.status_code == 404:
-                logging.info(f"Hash {file_hash[:8]}... not found in VT database")
-                return None
-            elif response.status_code == 429:
+        max_retries = 2
+        for attempt in range(max_retries):
+            try:
                 api_key = self.key_rotator.get_vt_key()
                 headers = {"x-apikey": api_key}
-                time.sleep(15)
-                response = requests.get(url, headers=headers, timeout=30)
-                if response.status_code == 200:
-                    return response.json()
-                return None
-            else:
-                return None
+                url = VT_API_URL_FILE_HASH.format(file_hash)
                 
-        except requests.exceptions.RequestException as e:
-            logging.error(f"Error checking hash: {e}")
-            return None
+                response = requests.get(url, headers=headers, timeout=30)
+                
+                if response.status_code == 200:
+                    logging.info(f"Hash {file_hash[:8]}... found in VT database")
+                    return response.json()
+                elif response.status_code == 404:
+                    logging.info(f"Hash {file_hash[:8]}... not found in VT database")
+                    return None
+                elif response.status_code == 429:
+                    logging.warning(f"Rate limit hit on hash check, rotating key")
+                    time.sleep(15)
+                    continue
+                elif response.status_code == 401:
+                    logging.warning(f"Unauthorized (401) on hash check, rotating key")
+                    time.sleep(5)
+                    continue
+                else:
+                    logging.warning(f"Unexpected status code {response.status_code} checking hash")
+                    return None
+                    
+            except requests.exceptions.RequestException as e:
+                logging.error(f"Error checking hash: {e}")
+                if attempt < max_retries - 1:
+                    time.sleep(5)
+                    
+        return None
     
     def submit_file(self, file_path: str) -> Optional[Tuple[str, str]]:
         if not os.path.exists(file_path):
@@ -455,21 +462,27 @@ class VirusTotalAnalyzer:
         
         logging.info(f"Submitting {os.path.basename(file_path)} to VT")
         
-        api_key = self.key_rotator.get_vt_key()
-        headers = {"x-apikey": api_key}
-        
         max_retries = 3
         for attempt in range(max_retries):
             try:
+                #Get a fresh key for each attempt
+                api_key = self.key_rotator.get_vt_key()
+                logging.debug(f"API key length: {len(api_key)}, starts with: {api_key[:8]}..., ends with: ...{api_key[-8:]}")
+                headers = {"x-apikey": api_key}
+                
                 with open(file_path, "rb") as file:
                     files = {"file": (os.path.basename(file_path), file)}
                     response = requests.post(VT_API_URL_FILES, headers=headers, files=files, timeout=120)
                     
                     if response.status_code == 429:
                         logging.warning("Rate limit hit, rotating key")
-                        api_key = self.key_rotator.get_vt_key()
-                        headers = {"x-apikey": api_key}
                         time.sleep(15)
+                        continue
+                    
+                    if response.status_code == 401:
+                        logging.warning(f"Unauthorized (401), rotating key. Response: {response.text[:200]}")
+                        logging.debug(f"Will rotate to new key for retry")
+                        time.sleep(5)
                         continue
                     
                     response.raise_for_status()
@@ -492,19 +505,27 @@ class VirusTotalAnalyzer:
     def get_analysis_report(self, analysis_id: str, api_key: str, max_wait_time: int = 300) -> Optional[Dict]:
         logging.info(f"Waiting for analysis {analysis_id}")
         
-        headers = {"x-apikey": api_key}
         url = VT_API_URL_ANALYSES.format(analysis_id)
         
         start_time = time.time()
         retry_delay = 20
+        current_key = api_key
         
         while time.time() - start_time < max_wait_time:
             try:
+                headers = {"x-apikey": current_key}
                 response = requests.get(url, headers=headers, timeout=30)
                 
                 if response.status_code == 429:
-                    logging.warning("Rate limit hit, waiting longer before retry")
+                    logging.warning("Rate limit hit, rotating key and waiting")
+                    current_key = self.key_rotator.get_vt_key()
                     time.sleep(15)
+                    continue
+                
+                if response.status_code == 401:
+                    logging.warning("Unauthorized (401) fetching report, rotating key")
+                    current_key = self.key_rotator.get_vt_key()
+                    time.sleep(5)
                     continue
                 
                 response.raise_for_status()
@@ -751,18 +772,37 @@ class RepositoryLabelingPipeline:
         if not os.path.exists(group_path):
             logging.error(f"Group path does not exist: {group_path}")
             return []
-        
+        repos_filecounts = []
+
         for repo_dir in os.listdir(group_path):
             repo_path = os.path.join(group_path, repo_dir)
             if os.path.isdir(repo_path):
                 for file in os.listdir(repo_path):
                     if file.endswith('.h5'):
                         hdf5_path = os.path.join(repo_path, file)
-                        hdf5_files.append((repo_dir, hdf5_path))
+
+                        try:
+                            with h5py.File(hdf5_path, 'r') as h5file:
+                                if 'codebase' in h5file and 'files' in h5file['codebase']:
+                                    file_count = len(h5file['codebase']['files'])
+                                else:
+                                    file_count = 0
+                        except Exception as e:
+                            logging.warning(f"Error reading HDF5 {hdf5_path}: {e}")
+                            file_count = 0
+                    
+                        repos_filecounts.append((repo_dir, hdf5_path, file_count))
                         break
         
-        logging.info(f"Found {len(hdf5_files)} HDF5 files")
-        return hdf5_files
+        repos_filecounts.sort(key=lambda x: x[2])
+
+        for repo_dir, hdf5_path, file_count in repos_filecounts[:5]:
+            logging.info(f"Repo: {repo_dir}, Files: {file_count}")
+
+        
+        logging.info(f"Found {len(repos_filecounts)} HDF5 files")
+
+        return [(repo_dir, hdf5_path) for repo_dir, hdf5_path, _ in repos_filecounts]
     
     def scan_file(self, repo_name: str, file_path: str, full_path: str) -> Optional[Dict]:
         file_hash = self.extractor.calculate_file_hash(full_path)
@@ -845,7 +885,9 @@ class RepositoryLabelingPipeline:
                 self.db.update_status(repo_name, "failed", "No files extracted")
                 return False
             
-            file_scores = keyword_analysis.get('file_scores', []) if keyword_analysis else []
+            from keyword_analyzer import KeywordDatabase
+            keyword_db = KeywordDatabase()
+            file_scores = keyword_db.get_file_scores(repo_name)
             malicious_file_paths = set()
             
             if file_scores and self.scan_only_malicious_files:
@@ -1058,7 +1100,7 @@ def main():
     
     DATASET_BASE_PATH = os.path.expanduser("~/scratch/crawler/subset")
     GROUP_NAME = "all_repos_fivek"
-    MAX_REPOS = 100  # Set to an integer to limit number of repos, or None for no limit
+    MAX_REPOS = None
     
     if not VT_API_KEYS or len(VT_API_KEYS) == 0:
         print("Configure your VT API keys first")
