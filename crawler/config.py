@@ -10,11 +10,23 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-BASE_PATH = f"fivekdataset"
-CRAWLED_DB_PATH = f"crawler_db.sqlite"
-GROUP_NAME = "all_repos_fivek"
-GITHUB_TOKEN = os.environ.get("GPAT")
-BATCH_SIZE = 5000 
+BASE_PATH = os.environ.get("CRAWLER_BASE_PATH", "fivekdataset")
+CRAWLED_DB_PATH = os.environ.get("CRAWLER_DB_PATH", "crawler_db.sqlite")
+GROUP_NAME = os.environ.get("CRAWLER_GROUP_NAME", "all_repos_fivek")
+# Prefer GITHUB_TOKEN; fallback to GPAT for backward compatibility
+GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN") or os.environ.get("GPAT")
+BATCH_SIZE = 5000
+
+# Time window for "around 2022" (configurable via CLI)
+DEFAULT_START_DATE = "2021-10-01"
+DEFAULT_END_DATE = "2022-12-31"
+DEFAULT_TARGET_DATE = "2022-06-30"
+
+# Output layout: dataset/snapshots/owner__repo/snapshot_sha/ + metadata.json
+DATASET_PATH = os.environ.get("CRAWLER_DATASET_PATH", "dataset")
+SNAPSHOTS_PATH = os.path.join(DATASET_PATH, "snapshots")
+MANIFEST_PATH = os.path.join(DATASET_PATH, "manifest.jsonl")
+
 
 def ensure_dirs():
     """
@@ -26,6 +38,9 @@ def ensure_dirs():
     group_path = os.path.join(BASE_PATH, GROUP_NAME)
     os.makedirs(group_path, exist_ok=True)
     logging.info(f"Ensured group path exists: {group_path}")
+    os.makedirs(DATASET_PATH, exist_ok=True)
+    os.makedirs(SNAPSHOTS_PATH, exist_ok=True)
+    logging.info(f"Ensured dataset/snapshots path: {SNAPSHOTS_PATH}")
 
     conn = None
     try:
@@ -37,6 +52,38 @@ def ensure_dirs():
                 id INTEGER PRIMARY KEY,
                 last_crawled_date TEXT,
                 last_crawled_page INTEGER
+            )
+        """)
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS ApiCache (
+                key TEXT PRIMARY KEY,
+                etag TEXT,
+                response_json TEXT,
+                fetched_at TEXT
+            )
+        """)
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS CommitCache (
+                repo_owner_repo TEXT NOT NULL,
+                branch TEXT NOT NULL,
+                start_date TEXT NOT NULL,
+                end_date TEXT NOT NULL,
+                commits_json TEXT NOT NULL,
+                fetched_at TEXT NOT NULL,
+                PRIMARY KEY (repo_owner_repo, branch, start_date, end_date)
+            )
+        """)
+        c.execute("""
+            CREATE TABLE IF NOT EXISTS SnapshotManifest (
+                full_name TEXT PRIMARY KEY,
+                chosen_sha TEXT,
+                chosen_date TEXT,
+                selection_reason TEXT,
+                default_branch TEXT,
+                html_url TEXT,
+                license_info TEXT,
+                manifest_json TEXT,
+                updated_at TEXT
             )
         """)
         conn.commit()

@@ -497,7 +497,7 @@ Respond with JSON format with "variants" array containing name, description, cod
         dependency_files = {
             'go': ['go.mod', 'go.sum'],
             'python': ['requirements.txt', 'setup.py', 'pyproject.toml'],
-            'javascript': ['package.json', 'package-lock.json', 'node_modules'],
+            'javascript': ['package.json', 'package-lock.json'],
             'java': ['pom.xml', 'build.gradle', 'gradle'],
             'rust': ['Cargo.toml', 'Cargo.lock']
         }

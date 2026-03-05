@@ -1,13 +1,38 @@
+"""
+Crawler entrypoint: seed ingestion, time-window search, snapshot export.
+Usage:
+  - Crawl seeds only:        python main.py --seed-file malware_repos.txt --seeds-only
+  - Crawl search + window:  python main.py --seed-file malware_repos.txt --start-date 2021-10-01 --end-date 2022-12-31
+  - Force tmetz repo:       python main.py --force-repo tmetz/python-for-cybersecurity-py2
+"""
 import os
-import shutil
+import sys
+import json
 import logging
-import time
-from concurrent.futures import ProcessPoolExecutor, as_completed
-from clone import clone_repo
-from github_api import get_repo_batch, fetch_all_metadata
-from extract import extract_commits
-from storage import save_repo_data, mark_as_crawled
-from config import BASE_PATH, CRAWLED_DB_PATH, BATCH_SIZE, GROUP_NAME, ensure_dirs, load_crawled_repos
+import argparse
+from datetime import datetime
+
+# Ensure crawler package imports work when run from project root or crawler/
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+from config import (
+    ensure_dirs,
+    GITHUB_TOKEN,
+    SNAPSHOTS_PATH,
+    MANIFEST_PATH,
+    DEFAULT_START_DATE,
+    DEFAULT_END_DATE,
+    DEFAULT_TARGET_DATE,
+)
+from time_window import parse_seeds, qualifies_in_window
+from github_api import (
+    fetch_repo_metadata,
+    resolve_snapshot_sha,
+    search_repos_time_window,
+    fetch_commits_in_window,
+)
+from clone import clone_and_export_at_sha
+from storage import save_snapshot_manifest_row, mark_as_crawled
 
 logging.basicConfig(
     filename="crawler.log",
@@ -16,104 +41,149 @@ logging.basicConfig(
     level=logging.INFO
 )
 
-TARGET_REPOS = 15000
-MAX_CLONE_THREADS = 10
-MAX_PROCESS_WORKERS = os.cpu_count() or 4
-MAX_RETRIES = 3
-CRAWL_LANGUAGES = ['Python', 'JavaScript', 'Go', 'TypeScript', 'Java', 'C', 'C++', 'Ruby', 'PHP', 'Rust']
 
-
-def retry_clone_repo(full_name, retries=MAX_RETRIES):
-    for attempt in range(1, retries + 1):
-        try:
-            repo_path, repo_name = clone_repo(full_name)
-            if repo_path and repo_name:
-                return repo_path, repo_name
-            logging.warning(f"Clone failed for {full_name} (attempt {attempt})")
-        except Exception as e:
-            logging.error(f"Clone error for {full_name} (attempt {attempt}): {e}")
-        time.sleep(2 * attempt)  
-    logging.error(f"Failed to clone {full_name} after {retries} attempts")
-    return None, None
-
-def remove_repo_folder(path):
-    logging.info(f"Removing data from {path}")
-    if os.path.exists(path):
-        shutil.rmtree(path,ignore_errors=True)
-
-def process_repo_data(full_name):
-    try:
-        logging.info(f"Starting process data for {full_name}")
-        repo_path, repo_name = retry_clone_repo(full_name)
-        owner, repo_name_part = full_name.split("/")
-
-        commits = extract_commits(repo_path)
-        if not commits:
-            logging.warning(f"No commits for {full_name}")
-
-        
-
-        repo_metadata = fetch_all_metadata(owner, repo_name_part)
-        if not repo_metadata:
-            logging.warning(f"No metadata for {full_name}")
-
-        save_repo_data(GROUP_NAME, repo_name, repo_metadata, commits, {}, repo_path)
-        mark_as_crawled(full_name)
-        remove_repo_folder(repo_path)
-
-        logging.info(f"Successfully processed {full_name}")
-    except Exception as e:
-        logging.error(f"Error processing {full_name}: {e}")
-
-
-def crawl_loop():
-    logging.info(f"Starting crawl for {TARGET_REPOS} repos")
+def run_snapshot_crawl(
+    seed_file: str = None,
+    seed_repos: str = None,
+    start_date: str = DEFAULT_START_DATE,
+    end_date: str = DEFAULT_END_DATE,
+    target_date: str = DEFAULT_TARGET_DATE,
+    strict_time_filter: bool = True,
+    force_repo: str = None,
+    search_keywords: list = None,
+    seeds_only: bool = False,
+    max_repos: int = None,
+):
+    if not GITHUB_TOKEN:
+        logging.error("GITHUB_TOKEN (or GPAT) not set. Set env GITHUB_TOKEN.")
+        return
     ensure_dirs()
+    start_dt = datetime.strptime(start_date, "%Y-%m-%d")
+    end_dt = datetime.strptime(end_date, "%Y-%m-%d")
+    target_dt = datetime.strptime(target_date, "%Y-%m-%d")
 
-    while True:
-        seen_repos = load_crawled_repos()
-        current_count = len(seen_repos)
-        if current_count >= TARGET_REPOS:
-            logging.info("Target reached. Stopping crawl.")
-            break
+    seeds = parse_seeds(seed_file, seed_repos)
+    if force_repo:
+        force_repo = force_repo.strip()
+        if "/" in force_repo and force_repo not in seeds:
+            seeds.append(force_repo)
+    repo_list = list(dict.fromkeys(seeds))
+    logging.info(f"Seeds (including force-repo): {len(repo_list)}")
 
-        to_fetch = min(BATCH_SIZE, TARGET_REPOS - current_count)
-        if to_fetch <= 0:
-            break
+    if not seeds_only:
+        seen = set(repo_list)
+        keywords = search_keywords or ["0day", "exploit", "malware"]
+        discovered = search_repos_time_window(
+            keywords, start_date, end_date, seen, limit=max_repos or 500, strict_time_filter=strict_time_filter
+        )
+        for r in discovered:
+            if r not in seen:
+                repo_list.append(r)
+                seen.add(r)
+        logging.info(f"After search: {len(repo_list)} repos to process")
 
-        repos_to_process = get_repo_batch(seen_repos, to_fetch, languages=CRAWL_LANGUAGES)
-        if not repos_to_process:
-            logging.warning("No new repos. Waiting.")
-            time.sleep(60)
+    if max_repos and len(repo_list) > max_repos:
+        repo_list = repo_list[:max_repos]
+
+    for i, full_name in enumerate(repo_list):
+        if "/" not in full_name:
+            continue
+        owner, repo = full_name.split("/", 1)
+        is_seed = full_name in seeds or full_name == force_repo
+        logging.info(f"[{i+1}/{len(repo_list)}] Processing {full_name} (seed={is_seed})")
+        try:
+            meta = fetch_repo_metadata(owner, repo)
+            if not meta:
+                logging.warning(f"No metadata for {full_name}, skipping.")
+                continue
+            default_branch = meta.get("default_branch") or "main"
+            html_url = meta.get("html_url") or f"https://github.com/{full_name}"
+            license_info = ""
+            if meta.get("license") and isinstance(meta["license"], dict):
+                license_info = meta["license"].get("spdx_id") or meta["license"].get("key") or ""
+            elif meta.get("license"):
+                license_info = str(meta["license"])
+
+            sha, chosen_date, reason = resolve_snapshot_sha(
+                owner, repo, target_dt, start_dt, end_dt, is_seed=is_seed
+            )
+            if not sha:
+                logging.warning(f"Could not resolve SHA for {full_name}, skipping.")
+                continue
+            if not is_seed and strict_time_filter:
+                commits_in_window = []
+                since_str = start_dt.strftime("%Y-%m-%dT00:00:00Z")
+                until_str = end_dt.strftime("%Y-%m-%dT23:59:59Z")
+                commits_in_window = fetch_commits_in_window(owner, repo, default_branch, since_str, until_str, use_commit_cache=True)
+                qual, qreason = qualifies_in_window(meta, start_dt, end_dt, commits_in_window)
+                if not qual:
+                    logging.info(f"{full_name} does not qualify in window ({qreason}), skipping.")
+                    continue
+
+            folder_name = full_name.replace("/", "__")
+            snapshot_sha_dir = os.path.join(SNAPSHOTS_PATH, folder_name, sha)
+            metadata = {
+                "owner": owner,
+                "repo": repo,
+                "full_name": full_name,
+                "html_url": html_url,
+                "chosen_sha": sha,
+                "chosen_snapshot_date": chosen_date,
+                "selection_reason": reason,
+                "default_branch": default_branch,
+                "license": license_info,
+            }
+            ok = clone_and_export_at_sha(full_name, sha, snapshot_sha_dir, metadata)
+            if not ok:
+                continue
+            manifest_line = json.dumps({
+                "owner/name": full_name,
+                "html_url": html_url,
+                "chosen_snapshot_sha": sha,
+                "chosen_snapshot_date": chosen_date,
+                "selection_reason": reason,
+                "default_branch": default_branch,
+                "license": license_info,
+            })
+            save_snapshot_manifest_row(
+                full_name, sha, chosen_date or "", reason, default_branch, html_url, license_info, manifest_line
+            )
+            mark_as_crawled(full_name)
+        except Exception as e:
+            logging.error(f"Error processing {full_name}: {e}")
             continue
 
-        
-        with ProcessPoolExecutor(max_workers=MAX_PROCESS_WORKERS) as executor:
-            futures = [executor.submit(process_repo_data, full_name)
-                       for full_name in repos_to_process]
-            for future in as_completed(futures):
-                future.result()  
+    logging.info(f"Snapshot crawl done. Manifest: {MANIFEST_PATH}")
 
-        logging.info("Batch done. Pausing before next.")
-        time.sleep(5)
 
-    logging.info("Crawling complete.")
+def main():
+    p = argparse.ArgumentParser(description="Crawl GitHub repos with seed list and time-window snapshot.")
+    p.add_argument("--seed-file", default=None, help="Path to seed file (one owner/repo per line).")
+    p.add_argument("--seed-repos", default=None, help="Comma-separated owner/repo list.")
+    p.add_argument("--start-date", default=DEFAULT_START_DATE, help=f"Window start (default {DEFAULT_START_DATE}).")
+    p.add_argument("--end-date", default=DEFAULT_END_DATE, help=f"Window end (default {DEFAULT_END_DATE}).")
+    p.add_argument("--target-date", default=DEFAULT_TARGET_DATE, help=f"Target date for closest commit (default {DEFAULT_TARGET_DATE}).")
+    p.add_argument("--strict-time-filter", action="store_true", default=True, help="Only include repos that qualify in window (default True).")
+    p.add_argument("--no-strict-time-filter", action="store_false", dest="strict_time_filter", help="Allow repos outside window.")
+    p.add_argument("--force-repo", default=None, help="Force include repo (e.g. tmetz/python-for-cybersecurity-py2).")
+    p.add_argument("--search-keywords", default=None, nargs="*", help="Search keywords (default: 0day exploit malware).")
+    p.add_argument("--seeds-only", action="store_true", help="Only crawl seed repos (no search).")
+    p.add_argument("--max-repos", type=int, default=None, help="Max repos to process (default no limit).")
+    args = p.parse_args()
 
-def process_current_dataset():
-    current_path = os.path.dirname(os.path.abspath(__file__))
-    dataset_path = os.path.join(current_path, "dataset")
-    repos = os.listdir(dataset_path)
-    cloned_repos = []
+    run_snapshot_crawl(
+        seed_file=args.seed_file,
+        seed_repos=args.seed_repos,
+        start_date=args.start_date,
+        end_date=args.end_date,
+        target_date=args.target_date,
+        strict_time_filter=args.strict_time_filter,
+        force_repo=args.force_repo,
+        search_keywords=args.search_keywords,
+        seeds_only=args.seeds_only,
+        max_repos=args.max_repos,
+    )
 
-    for repo in repos:
-        full_name = repo.replace("_","/")
-        cloned_repos.append((full_name, f"{dataset_path}/{repo}", repo))
-    
-    with ProcessPoolExecutor(max_workers=MAX_PROCESS_WORKERS) as executor:
-            futures = [executor.submit(process_repo_data, full_name, path, name)
-                       for full_name, path, name in cloned_repos]
-            for future in as_completed(futures):
-                future.result()
 
 if __name__ == "__main__":
-    crawl_loop()
+    main()

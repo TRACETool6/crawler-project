@@ -14,11 +14,12 @@ logging.basicConfig(
 )
 
 try:
-    from config import BASE_PATH, CRAWLED_DB_PATH
+    from config import BASE_PATH, CRAWLED_DB_PATH, MANIFEST_PATH, SNAPSHOTS_PATH
 except ImportError:
-    logging.error("Could not import BASE_PATH or CRAWLED_DB_PATH from config.py. Please ensure config.py exists and contains these variables.")
     BASE_PATH = "dataset"
     CRAWLED_DB_PATH = "crawler_db.sqlite"
+    MANIFEST_PATH = os.path.join(BASE_PATH, "manifest.jsonl")
+    SNAPSHOTS_PATH = os.path.join(BASE_PATH, "snapshots")
 
 
 
@@ -345,3 +346,28 @@ def mark_as_crawled(full_name):
     finally:
         if conn:
             conn.close()
+
+
+def save_snapshot_manifest_row(full_name: str, chosen_sha: str, chosen_date: str, selection_reason: str,
+                               default_branch: str, html_url: str, license_info: str, manifest_json: str):
+    """Upsert one row into SnapshotManifest and append to manifest.jsonl."""
+    conn = None
+    try:
+        conn = sqlite3.connect(CRAWLED_DB_PATH)
+        c = conn.cursor()
+        c.execute("""
+            INSERT OR REPLACE INTO SnapshotManifest
+            (full_name, chosen_sha, chosen_date, selection_reason, default_branch, html_url, license_info, manifest_json, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (full_name, chosen_sha, chosen_date, selection_reason, default_branch, html_url, license_info, manifest_json, datetime.now().isoformat()))
+        conn.commit()
+    except sqlite3.Error as e:
+        logging.error(f"SQLite error saving snapshot manifest row: {e}")
+    finally:
+        if conn:
+            conn.close()
+    try:
+        with open(MANIFEST_PATH, "a", encoding="utf-8") as f:
+            f.write(manifest_json.strip() + "\n")
+    except OSError as e:
+        logging.warning(f"Could not append to manifest.jsonl: {e}")
