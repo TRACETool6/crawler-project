@@ -886,8 +886,8 @@ class KeywordExtractor:
         if context_score > 0:
             suspicion_reasons.append(f"Suspicious file characteristics (+{context_score:.1f} points)")
         
-        #Determine if file is malicious (threshold: 40/100 normalized score)
-        is_malicious = normalized_score >= 40.0 or len(critical_keywords) >= 2
+        #Determine if file is malicious (threshold: 60/100 normalized score)
+        is_malicious = normalized_score >= 60.0 or len(critical_keywords) >= 3
         
         return {
             'file_path': file_path,
@@ -936,11 +936,14 @@ class KeywordAnalyzer:
             elif not YARA_AVAILABLE:
                 logging.info("Real YARA scanner not available (install yara-python)")
         
-        #Thresholds for determining suspiciousness 
-        self.weighted_score_threshold = 50.0  #Weighted score threshold
-        self.critical_keyword_threshold = 1   #Even 1 critical keyword is suspicious
-        self.yara_rule_match_threshold = 1    #Number of YARA rules to trigger
-        self.pattern_threshold = 3            #Number of suspicious patterns
+        # Thresholds for determining suspiciousness.
+        # Repo is flagged only when at least N "evidence signals" co-occur,
+        # reducing false positives from any single weak indicator.
+        self.evidence_count_threshold = 2
+        self.weighted_score_threshold = 100.0  # Weighted keyword score threshold
+        self.critical_keyword_threshold = 1   # 1+ critical keyword contributes evidence
+        self.yara_rule_match_threshold = 1    # 1+ YARA-style rule match contributes evidence
+        self.pattern_threshold = 4            # Number of suspicious patterns contributing evidence (lowered from 6)
     
     def extract_from_hdf5(self, hdf5_path: str) -> List[Tuple[str, str]]:
         """Extract text files from HDF5"""
@@ -1134,24 +1137,49 @@ class KeywordAnalyzer:
         max_possible_score = 200.0  # Estimated maximum
         normalized_score = min(combined_weighted_score / max_possible_score, 1.0)
         
-        # Determine if suspicious using multiple criteria
-        is_suspicious = (
-            len(critical_keywords) >= self.critical_keyword_threshold or
-            len(yara_matches) >= self.yara_rule_match_threshold or
-            weighted_keyword_score >= self.weighted_score_threshold or
-            pattern_count >= self.pattern_threshold
-        )
+        # Determine if suspicious using corroboration (>= N evidence signals).
+        # Signal 1: Critical keywords
+        critical_evidence = len(critical_keywords) >= self.critical_keyword_threshold
+        
+        # Signal 2: YARA-style rule matches
+        yara_evidence = len(yara_matches) >= self.yara_rule_match_threshold
+        
+        # Signal 3: High weighted keyword score
+        weighted_evidence = weighted_keyword_score >= self.weighted_score_threshold
+        
+        # Signal 4: Suspicious code patterns
+        pattern_evidence = pattern_count >= self.pattern_threshold
+        
+        # Signal 5: Malware-like repository name
+        repo_name_evidence = bool(re.search(
+            r"(grabber|stealer|wallet|keylogger|rat|backdoor|crypter|injector|miner|ransomware|trojan|virus|worm|payload|exploit|shell|hack)",
+            repo_name.lower()
+        ))
+
+        evidence_count = sum([
+            1 if critical_evidence else 0,
+            1 if yara_evidence else 0,
+            1 if weighted_evidence else 0,
+            1 if pattern_evidence else 0,
+            1 if repo_name_evidence else 0,
+        ])
+
+        is_suspicious = evidence_count >= self.evidence_count_threshold
         
         # Determine reason for suspicion
         suspicion_reasons = []
-        if len(critical_keywords) > 0:
+        if critical_evidence:
             suspicion_reasons.append(f"Critical keywords: {', '.join(critical_keywords[:5])}")
-        if len(yara_matches) > 0:
+        if yara_evidence:
             suspicion_reasons.append(f"YARA rules: {', '.join([m['rule_name'] for m in yara_matches[:3]])}")
-        if weighted_keyword_score >= self.weighted_score_threshold:
+        if weighted_evidence:
             suspicion_reasons.append(f"High weighted score: {weighted_keyword_score:.1f}")
-        if pattern_count >= self.pattern_threshold:
+        if pattern_evidence:
             suspicion_reasons.append(f"Suspicious patterns: {pattern_count}")
+        if repo_name_evidence:
+            suspicion_reasons.append(f"Malware-like repo name: '{repo_name}'")
+        if is_suspicious:
+            suspicion_reasons.append(f"Evidence signals: {evidence_count}/{self.evidence_count_threshold}")
         
         embedding_vector = None
 
